@@ -1,0 +1,37 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper, margin=2cm]{geometry}
+\usepackage[OT4, plmath]{polski}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{float}
+
+\title{
+	Obliczenia równoległe na kartach graficznych CUDA \\
+	Projekt \\
+	Obliczanie otoczki wypukłej \\
+}
+\author{Hubert Obrzut}
+\date{}
+
+\begin{document}
+
+	\maketitle
+	
+	\large
+	
+	\textbf{Projekt}: obliczanie otoczki wypukłej na GPU.
+	
+	\begin{itemize}
+		\item Celem projektu jest zaimplementowanie algorytmu obliczającego otoczkę wypukłą na GPU oraz porównanie jego wydajności zarówno z odpowiednikiem (algorytmu) na CPU, jak i alternatywami.
+		\item Opieram się na pracy naukowej \href{https://www.researchgate.net/publication/271146554_A_Novel_Implementation_of_QuickHull_Algorithm_on_the_GPU}{\textit{A Novel Implementation of QuickHull Algorithm on the GPU}}.
+		\item Praca dotyczy algorytmu \texttt{QuickHull} -- typu \textbf{Divide-and-Conquer}, podobny do algorytmu \texttt{QuickSort}.
+		\item Algorytm w całości powinien działać na GPU.
+		\item Do implementacji użyję głównie wykorzystać bibliotekę \texttt{Thrust} -- zarówno uproszczenie implementacji, jak i zwiększenie czytelności.
+		\item Wydajność implementacji na GPU porównam z implementacją \texttt{QuickHull} na CPU. Dodatkowo zamierzam zaimplementować algorytm \texttt{Graham-Scan} na CPU (aktualna otoczka jako stos, sortowanie) jako referencja do alternatywnej implementacji obliczającej otoczkę wypukłą.
+		\item Zarówno wszystkie punkty jak i otoczkę wyświetlę używając OpenGL (być może również krawędzie łączące punkty otoczki, tworzące wielokąt wypukły).
+		\item Punkty do obliczenia otoczki wylosuję. Rozważam również wcześniej ustalone zbiory punktów, np. zbiory nielosowe, punkty modelu.
+	\end{itemize}
+	
+\end{document}
