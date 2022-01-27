@@ -1,5 +1,6 @@
 ConvexHull
 *.tex
+compile_commands.json
 
 build/
 ii_compat/
