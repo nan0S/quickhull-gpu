@@ -11,4 +11,5 @@ struct Config
 {
 	DatasetType dataset_type;
 	uint32_t seed;
+	bool is_host_mem;
 };

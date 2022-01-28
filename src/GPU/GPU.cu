@@ -61,11 +61,14 @@ namespace GPU
 	static constexpr int CURAND_USAGE_THRESHOLD = 12'000'000;
 
 	curandGenerator_t gen;
+	bool is_curand_init;
 	thrust::minstd_rand rng;
 	thrust::uniform_real_distribution<float> adist(0, 2 * PI);
 	thrust::uniform_real_distribution<float> rdist;
+	bool is_rng_init;
 	int max_n;
 	GLuint vbo;
+	bool is_host_mem;
 	cudaGraphicsResource_t resource;
 	void* d_buffer;
 	float* h_buffer;
@@ -93,10 +96,11 @@ namespace GPU
 							cudaMemcpyHostToDevice)); }
 
 	__device__ float cross(float ux, float uy, float vx, float vy);
-	size_t getMemoryNeeded(int n);
+	size_t getCudaMemoryNeeded(int n);
 
 	void init(Config config, const std::vector<int>& ns, GLuint vbo_id)
 	{
+
 		int max_n_below_curand_threshold = 0;
 		for (int n : ns)
 		{
@@ -124,23 +128,39 @@ namespace GPU
 
 		if (max_n >= CURAND_USAGE_THRESHOLD)
 		{
+			is_curand_init = true;
 			curandCall(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_MT19937));
 			curandCall(curandSetPseudoRandomGeneratorSeed(gen, config.seed));
 			cudaCall(cudaMemcpyToSymbol(d_r_min, &r_min, sizeof(float)));
 			cudaCall(cudaMemcpyToSymbol(d_r_max, &r_max, sizeof(float)));
 		}
-		if (max_n_below_curand_threshold != 0)
-		{
-			h_buffer = new float[2 * max_n_below_curand_threshold];
-			rng.seed(config.seed);
-			rdist = thrust::uniform_real_distribution<float>(r_min, r_max);
-		}
-		
+
+		is_host_mem = config.is_host_mem;
 		vbo = vbo_id;
-		size_t needed = getMemoryNeeded(max_n);
-		glCall(glBufferData(GL_ARRAY_BUFFER, needed, NULL, GL_STATIC_DRAW));
-		cudaCall(cudaGraphicsGLRegisterBuffer(&resource, vbo,
-			cudaGraphicsMapFlagsWriteDiscard));
+
+		size_t cuda_needed = getCudaMemoryNeeded(max_n);
+		if (!is_host_mem)
+		{
+			glCall(glBufferData(GL_ARRAY_BUFFER, cuda_needed, NULL, GL_STATIC_DRAW));
+			cudaCall(cudaGraphicsGLRegisterBuffer(&resource, vbo,
+				cudaGraphicsMapFlagsWriteDiscard));
+			if (max_n_below_curand_threshold != 0)
+			{
+				rng.seed(config.seed);
+				rdist = thrust::uniform_real_distribution<float>(r_min, r_max);
+				size_t host_bytes = 2 * max_n_below_curand_threshold * sizeof(float);
+				cudaCall(cudaMallocHost(&h_buffer, host_bytes));
+				is_rng_init = true;
+			}
+		}
+		else
+		{
+			size_t bytes = 2 * sizeof(float) * max_n;
+			glCall(glBufferData(GL_ARRAY_BUFFER, bytes, NULL, GL_STATIC_DRAW));
+			cudaCall(cudaMalloc(&d_buffer, cuda_needed));
+			cudaCall(cudaMallocHost(&h_buffer, bytes));
+		}
+
 		glCall(glVertexAttribPointer(0, 1, GL_FLOAT, GL_FALSE, 0, 0));
 	}
 
@@ -149,12 +169,15 @@ namespace GPU
 		print("\nRunning GPU for ", n, " points.");
 
 		// Initialize pointers to previously allocated memory.
-		size_t size = 0;
-		size_t needed = getMemoryNeeded(n);
-		cudaCall(cudaGraphicsMapResources(1, &resource));
-		cudaCall(cudaGraphicsResourceGetMappedPointer(&d_buffer, &size, resource));
-		ASSERT(size >= needed);
-		cudaCall(cudaMemset(d_buffer, 0, needed));
+		size_t cuda_needed = getCudaMemoryNeeded(n);
+		if (!is_host_mem)
+		{
+			size_t size = 0;
+			cudaCall(cudaGraphicsMapResources(1, &resource));
+			cudaCall(cudaGraphicsResourceGetMappedPointer(&d_buffer, &size, resource));
+			ASSERT(size >= cuda_needed);
+		}
+		cudaCall(cudaMemset(d_buffer, 0, cuda_needed));
 
 		x = thrust::device_ptr<float>(reinterpret_cast<float*>(d_buffer));
 		y = thrust::device_ptr<float>(reinterpret_cast<float*>(x.get() + n));
@@ -316,20 +339,44 @@ namespace GPU
 
 		timer.stop();
 
-		cudaCall(cudaGraphicsUnmapResources(1, &resource));
+		// Just release mem by unmapping or copy from GPU to CPU to OpenGL.
+		if (!is_host_mem)
+		{
+			cudaCall(cudaGraphicsUnmapResources(1, &resource));
+		}
+		else
+		{
+			size_t bytes = 2 * N * sizeof(float);
+			cudaCall(cudaMemcpy(h_buffer, d_buffer, bytes, cudaMemcpyDeviceToHost));
+			glCall(glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, h_buffer));
+		}
+
 		glCall(glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 0,
-			(const void*)(N * sizeof(float))));
+				(const void*)(N * sizeof(float))));
 
 		return hull_count;
 	}
 
 	void terminate()
 	{
-		if (h_buffer != nullptr)
-			delete[] h_buffer;
-		cudaCall(cudaGraphicsUnregisterResource(resource));
-		if (max_n >= CURAND_USAGE_THRESHOLD)
+		if (!is_host_mem)
+		{
+			cudaCall(cudaGraphicsUnregisterResource(resource));
+			if (is_rng_init)
+			{
+				cudaCall(cudaFreeHost(h_buffer));
+			}
+		}
+		else
+		{
+			cudaCall(cudaFree(d_buffer));
+			cudaCall(cudaFreeHost(h_buffer));
+		}
+
+		if (is_curand_init)
+		{
 			curandCall(curandDestroyGenerator(gen));
+		}
 	}
 
 	__device__
@@ -440,7 +487,7 @@ namespace GPU
 		return ux * vy - vx * uy;
 	}
 
-	size_t getMemoryNeeded(int n)
+	size_t getCudaMemoryNeeded(int n)
 	{
 		return n * (3 * sizeof(float) + 4 * sizeof(int));
 	}

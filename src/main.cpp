@@ -36,6 +36,7 @@ const char* USAGE_STR =
 "   --ring        RING dataset of points\n"
 "   --circle      CIRCLE dataset of points\n"
 "   --seed VALUE  set random seed to VALUE\n"
+"   --hostmem     use only host memory, don't map OpenGL to CUDA\n"
 "   --help        print this help";
 
 const char* INSTRUCTIONS_STR =
@@ -83,7 +84,8 @@ static constexpr float LINE_COLOR[4] = { 0.f, 1.f, 0.f, 0.5f };
 static constexpr int WIDTH = 800;
 static constexpr int HEIGHT = 800;
 
-static constexpr Config DEFAULT_CONFIG{ DatasetType::DISC, 1234 };
+static constexpr Config DEFAULT_CONFIG{
+	DatasetType::DISC, 1234, false };
 
 GLFWwindow* window;
 GLint point_size_loc, color_loc;
@@ -133,18 +135,20 @@ int main(int argc, const char* argv[])
 				ERROR("Specified more than one compute mode.");
 			compute_mode = ComputeMode::CPU;
 		}
-		else if (strcmp(flag, "seed") == 0)
-		{
-			if (i == argc - 1)
-				ERROR("Argument for flag '", arg, "' is required.");
-			config.seed = std::stoi(argv[++i]);
-		}
 		else if (strcmp(flag, "disc") == 0)
 			config.dataset_type = DatasetType::DISC;
 		else if (strcmp(flag, "ring") == 0)
 			config.dataset_type = DatasetType::RING;
 		else if (strcmp(flag, "circle") == 0)
 			config.dataset_type = DatasetType::CIRCLE;
+		else if (strcmp(flag, "seed") == 0)
+		{
+			if (i == argc - 1)
+				ERROR("Argument for flag '", arg, "' is required.");
+			config.seed = std::stoi(argv[++i]);
+		}
+		else if (strcmp(flag, "hostmem") == 0)
+			config.is_host_mem = true;
 		else if (strcmp(flag, "help") == 0)
 		{
 			print(USAGE_STR);
