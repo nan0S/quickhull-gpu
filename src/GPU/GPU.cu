@@ -155,7 +155,7 @@ namespace GPU
 		}
 		else
 		{
-			size_t bytes = 2 * sizeof(float) * max_n;
+			size_t bytes = 2 * max_n * sizeof(float);
 			glCall(glBufferData(GL_ARRAY_BUFFER, bytes, NULL, GL_STATIC_DRAW));
 			cudaCall(cudaMalloc(&d_buffer, cuda_needed));
 			cudaCall(cudaMallocHost(&h_buffer, bytes));
@@ -261,7 +261,7 @@ namespace GPU
 			// aren't anymore points in the segment). However if there still is
 			// some precision-related issue, then this check is a guard from
 			// an infinite loop. It should be always false, however I leave it
-			// just in case (hull will be correct in respect to float::eps).
+			// just in case (hull will be correct with respect to float::eps).
 			if (hull_count == last_hull_count)
 				break;
 			last_hull_count = hull_count;
@@ -274,7 +274,7 @@ namespace GPU
 				thrust::make_zip_iterator(head + n, keys + n, iter + n),
 				thrust::make_zip_function(calc_first_pts{}));
 
-			// Calculate distances from line in segment.
+			// Calculate distances from segment lines.
 			thrust::transform(
 				thrust::make_zip_iterator(x, y, keys,
 					thrust::make_constant_iterator(hull_count)),
@@ -339,11 +339,12 @@ namespace GPU
 
 		timer.stop();
 
-		// Just release mem by unmapping or copy from GPU to CPU to OpenGL.
+		// Just release mem by unmapping.
 		if (!is_host_mem)
 		{
 			cudaCall(cudaGraphicsUnmapResources(1, &resource));
 		}
+        // Copy from GPU to CPU to OpenGL.
 		else
 		{
 			size_t bytes = 2 * N * sizeof(float);
