@@ -1,4 +1,4 @@
-TARGET 	  := ConvexHull
+TARGET    := ConvexHull
 
 SRC_DIR   := src
 BUILD_DIR := build
@@ -28,7 +28,7 @@ all: $(TARGET)
 $(TARGET): $(OBJ)
 	g++ $(CXXFLAGS) -o $@ $^ $(INC) $(LIB)
 
--include $(DEPENDS)
+-include $(DEP)
 
 $(BUILD_DIR)/%.o: %.cpp Makefile
 	@mkdir -p $(shell dirname $@)
@@ -40,3 +40,4 @@ $(BUILD_DIR)/%.o: %.cu Makefile
 
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)
+
