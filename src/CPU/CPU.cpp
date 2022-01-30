@@ -5,10 +5,9 @@
 #include <tuple>
 #include <algorithm>
 
-#include "Debug/Assert.h"
-#include "Debug/Logging.h"
-#include "Graphics/GLError.h"
 #include "Utils/Timer.h"
+#include "Utils/Log.h"
+#include "Graphics/Error.h"
 
 namespace CPU
 {
@@ -71,7 +70,7 @@ namespace CPU
 				r_min = 1.f; r_max = 1.f;
 				break;
 			default:
-				ASSERT(false);
+				assert(false);
 		}
         cpu_gen.rng.seed(config.seed);
         cpu_gen.adist.param(decltype(cpu_gen.adist)::param_type(0, 2 * PI));
@@ -167,18 +166,18 @@ namespace CPU
 
 	point* findHull(point* first, point* last, point u, point v)
 	{
-		ASSERT(*first == u);
+		assert(*first == u);
 		if (first + 1 == last)
 			return last;
 
-		point d = v - u, * far;
+		point d = v - u, * far = nullptr;
 		float dist = -1;
 		// We can skip the first one as it is partition boundary (u).
 		// Also at this point, we are sure there are at least 2 points.
 		for (point* it = first + 1; it != last; ++it)
 		{
 			float cur_dist = point::cross(d, u - *it);
-			ASSERT(cur_dist >= 0);
+			assert(cur_dist >= 0);
 			if (cur_dist > dist)
 			{
 				dist = cur_dist;
@@ -213,8 +212,8 @@ namespace CPU
         
 		std::sort(first, pivot, std::greater<>());
 		std::sort(pivot, last);
-		ASSERT(*first == right);
-		ASSERT(*pivot == left);
+		assert(*first == right);
+		assert(*pivot == left);
 
 		point* left_boundary = findHull(first, pivot, right, left);
 		point* right_boundary = findHull(pivot, last, left, right);
@@ -225,7 +224,7 @@ namespace CPU
 			point p = pivot[1];
 			if (point::cross(right - left, p - left) == 0)
 			{
-				ASSERT(pivot + 2 == right_boundary);
+				assert(pivot + 2 == right_boundary);
 				--right_boundary;
 			}
 		}

@@ -2,9 +2,9 @@
 
 #include <iostream>
 
-#include "Debug/Logging.h"
+#include "Utils/Log.h"
 
-Timer::Timer(const char* label /*="nullptr"*/)
+Timer::Timer(const char* label /* = nullptr */)
 	: m_Label(label), m_Start(clock_t::now()) {}
 
 Timer::~Timer()

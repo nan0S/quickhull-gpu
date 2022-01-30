@@ -1,9 +1,9 @@
-#include "GLError.h"
+#include "Error.h"
 
 #include <filesystem>
 #include <GL/glew.h>
 
-#include "Debug/Logging.h"
+#include "Utils/Log.h"
 
 namespace fs = std::filesystem;
 
@@ -20,9 +20,9 @@ bool glLogError(const char* call, const char* file, int line)
 	while ((errcode = glGetError()) != GL_NO_ERROR)
 	{
 		const char* msg = reinterpret_cast<const char*>(
-			gluErrorString(errcode));
+                gluErrorString(errcode));
 		WARNING("[OpenGL Error] ", filename, "::", line, " ", call, " '",
-			msg, "' (", errcode, ")");
+                msg, "' (", errcode, ")");
 		good = false;
 	}
 	return good;

@@ -1,6 +1,8 @@
-#include "CUDAError.h"
+#include "Error.h"
 
 #include <filesystem>
+
+#include "Utils/Log.h"
 
 namespace fs = std::filesystem;
 

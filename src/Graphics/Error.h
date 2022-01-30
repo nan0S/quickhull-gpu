@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Debug//Assert.h"
+#include <cassert>
 
 #define glCall(x) \
 	glClearError(); \
@@ -11,7 +11,7 @@
 	glCheckErrorExpr("")
 
 #define glCheckErrorExpr(x) \
-	ASSERT(glLogError(x, __FILE__, __LINE__));
+	assert(glLogError(x, __FILE__, __LINE__));
 
 void glClearError();
 bool glLogError(const char* call, const char* file, int line);

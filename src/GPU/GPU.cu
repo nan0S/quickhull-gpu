@@ -19,9 +19,10 @@
 #include <thrust/partition.h>
 #include <thrust/random.h>
 
-#include "GPU/CUDAError.h"
-#include "Graphics/GLError.h"
+#include "GPU/Error.h"
+#include "Graphics/Error.h"
 #include "Utils/Timer.h"
+#include "Utils/Log.h"
 
 namespace GPU
 {
@@ -153,7 +154,7 @@ namespace GPU
 				r_min = 1.f; r_max = 1.f;
 				break;
 			default:
-				ASSERT(false);
+				assert(false);
 		}
 
         if (max_n_below_curand_threshold != -1)
@@ -211,7 +212,7 @@ namespace GPU
 			size_t size = 0;
 			cudaCall(cudaGraphicsMapResources(1, &mem.resource));
 			cudaCall(cudaGraphicsResourceGetMappedPointer(&mem.d_buffer, &size, mem.resource));
-			ASSERT(size >= cuda_needed);
+			assert(size >= cuda_needed);
 		}
 		cudaCall(cudaMemset(mem.d_buffer, 0, cuda_needed));
 

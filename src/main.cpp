@@ -1,6 +1,7 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <cassert>
 
 #define GLFW_INCLUDE_NONE
 #include <GL/glew.h>
@@ -8,9 +9,9 @@
 
 #include "GPU/GPU.cuh"
 #include "CPU/CPU.h"
-#include "Graphics/GLError.h"
+#include "Graphics/Error.h"
 #include "Graphics/Shader.h"
-#include "Debug/Logging.h"
+#include "Utils/Log.h"
 #include "Config.h"
 
 /* enums and structs */
@@ -117,7 +118,7 @@ int main(int argc, const char* argv[])
 		std::cerr.imbue(comma_locale);
 	}
 
-	ASSERT(argc > 0);
+	assert(argc > 0);
 	ComputeMode compute_mode = ComputeMode::NONE;
 	Config config = DEFAULT_CONFIG;
 
@@ -148,7 +149,7 @@ int main(int argc, const char* argv[])
 			config.dataset_type = DatasetType::DISC;
 		else if (strcmp(flag, "ring") == 0)
 			config.dataset_type = DatasetType::RING;
-		else if (strcmp(flag, "circle") == 0)
+        else if (strcmp(flag, "circle") == 0)
 			config.dataset_type = DatasetType::CIRCLE;
 		else if (strcmp(flag, "seed") == 0)
 		{
@@ -253,7 +254,7 @@ int main(int argc, const char* argv[])
 			print("CPU mode selected.");
 			break;
         default:
-            ASSERT(false);
+            assert(false);
 	}
 	const char* dataset_name;
 	switch (config.dataset_type)
@@ -300,7 +301,7 @@ int main(int argc, const char* argv[])
 			break;
 		}
         default:
-            ASSERT(false);
+            assert(false);
 	}
 
     /* Cleanup. */

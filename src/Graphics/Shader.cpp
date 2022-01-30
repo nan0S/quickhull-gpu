@@ -3,8 +3,8 @@
 #include <fstream>
 #include <sstream>
 
-#include "Debug/Logging.h"
-#include "Graphics/GLError.h"
+#include "Utils/Log.h"
+#include "Graphics/Error.h"
 
 namespace Graphics
 {

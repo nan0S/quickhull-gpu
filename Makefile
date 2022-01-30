@@ -7,21 +7,25 @@ INC       := -I$(CUDA_HOME)/include -I./$(SRC_DIR)
 LIB       := -L$(CUDA_HOME)/lib64 -lcudart -lcurand -lGLEW -lGL -lglfw -lGLU
 
 VERSION   := -std=c++17
-CXXFLAGS  := $(VERSION) -O2 -DNDEBUG
-NVCCFLAGS := $(VERSION) -arch=sm_50 --ptxas-options=-O2 --use_fast_math -Wno-deprecated-gpu-targets
+CXXFLAGS  := $(VERSION) -Wall -pedantic
+CXXFLAGS  += -DNDEBUG -O2 -Wno-unused-variable
+# CXXFLAGS  += -ggdb -fno-omit-frame-pointer -O0 -O2
+NVCCFLAGS := $(VERSION) -arch=sm_50 -Wno-deprecated-gpu-targets
+NVCCFLAGS += --use_fast_math --ptxas-options=-O2
+# NVCCFLAGS += --ptxas-options=-O0
 
-SOURCES := $(shell find $(SRC_DIR) -name '*.cpp')
-OBJECTS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SOURCES))
-DEPENDS := $(patsubst %.cpp,$(BUILD_DIR)/%.d,$(SOURCES))
-SOURCES := $(shell find $(SRC_DIR) -name '*.cu')
-OBJECTS += $(patsubst %.cu,$(BUILD_DIR)/%.o,$(SOURCES))
-DEPENDS += $(patsubst %.cu,$(BUILD_DIR)/%.d,$(SOURCES))
+SRC := $(shell find $(SRC_DIR) -name '*.cpp')
+OBJ := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRC))
+DEP := $(patsubst %.cpp,$(BUILD_DIR)/%.d,$(SRC))
+SRC := $(shell find $(SRC_DIR) -name '*.cu')
+OBJ += $(patsubst %.cu,$(BUILD_DIR)/%.o,$(SRC))
+DEP += $(patsubst %.cu,$(BUILD_DIR)/%.d,$(SRC))
 
 .PHONY: clean
 
 all: $(TARGET)
 
-$(TARGET): $(OBJECTS)
+$(TARGET): $(OBJ)
 	g++ $(CXXFLAGS) -o $@ $^ $(INC) $(LIB)
 
 -include $(DEPENDS)

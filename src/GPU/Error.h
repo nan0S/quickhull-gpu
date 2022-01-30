@@ -1,8 +1,8 @@
 #pragma once
 
-#include <curand.h>
+#include <cassert>
 
-#include "Debug/Logging.h"
+#include <curand.h>
 
 #define curandCall(x) \
 	if ((x) != CURAND_STATUS_SUCCESS) \
