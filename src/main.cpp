@@ -40,7 +40,7 @@ void glfwErrorHandler(int errCode, const char* desc);
 void windowResizeHandler(GLFWwindow*, int width, int height);
 void windowKeyInputHandler(GLFWwindow*, int key, int, int action, int);
 bool displayHull(AppState state); // returns whether we should continue with the next test case
-void drawHull();
+void drawHull(AppState state);
 
 /* constants */
 const char* USAGE_STR =
@@ -343,22 +343,6 @@ void windowKeyInputHandler(GLFWwindow* window, int key, int,
 	}
 }
 
-void drawHull(AppState state)
-{
-	glCall(glClear(GL_COLOR_BUFFER_BIT));
-
-	glCall(glUniform1f(state.point_size_loc, NORMAL_POINT_SIZE));
-	glCall(glUniform4fv(state.color_loc, 1, NORMAL_POINT_COLOR));
-	glCall(glDrawArrays(GL_POINTS, state.hull_count, state.n_points - state.hull_count));
-	glCall(glUniform4fv(state.color_loc, 1, LINE_COLOR));
-	glCall(glDrawArrays(GL_LINE_LOOP, 0, state.hull_count));
-	glCall(glUniform1f(state.point_size_loc, HULL_POINT_SIZE));
-	glCall(glUniform4fv(state.color_loc, 1, HULL_POINT_COLOR));
-	glCall(glDrawArrays(GL_POINTS, 0, state.hull_count));
-
-	glfwSwapBuffers(state.window);
-}
-
 bool displayHull(AppState state)
 {
     if (glfwWindowShouldClose(state.window))
@@ -383,3 +367,20 @@ bool displayHull(AppState state)
 
 	return false;
 }
+
+void drawHull(AppState state)
+{
+	glCall(glClear(GL_COLOR_BUFFER_BIT));
+
+	glCall(glUniform1f(state.point_size_loc, NORMAL_POINT_SIZE));
+	glCall(glUniform4fv(state.color_loc, 1, NORMAL_POINT_COLOR));
+	glCall(glDrawArrays(GL_POINTS, state.hull_count, state.n_points - state.hull_count));
+	glCall(glUniform4fv(state.color_loc, 1, LINE_COLOR));
+	glCall(glDrawArrays(GL_LINE_LOOP, 0, state.hull_count));
+	glCall(glUniform1f(state.point_size_loc, HULL_POINT_SIZE));
+	glCall(glUniform4fv(state.color_loc, 1, HULL_POINT_COLOR));
+	glCall(glDrawArrays(GL_POINTS, 0, state.hull_count));
+
+	glfwSwapBuffers(state.window);
+}
+
