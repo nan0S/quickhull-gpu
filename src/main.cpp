@@ -13,6 +13,12 @@
 #include "Debug/Logging.h"
 #include "Config.h"
 
+/* enums and structs */
+enum class ComputeMode
+{
+	NONE, GPU, CPU
+};
+
 class comma_numpunct : public std::numpunct<char>
 {
 protected:
@@ -20,11 +26,23 @@ protected:
 	std::string do_grouping() const { return "\03"; }
 };
 
-enum class ComputeMode
+struct AppState
 {
-	NONE, GPU, CPU
+    GLFWwindow* window;
+    GLint point_size_loc;
+    GLint color_loc;
+    int n_points;
+    int hull_count;
 };
 
+/* forward declarations */
+void glfwErrorHandler(int errCode, const char* desc);
+void windowResizeHandler(GLFWwindow*, int width, int height);
+void windowKeyInputHandler(GLFWwindow*, int key, int, int action, int);
+bool displayHull(AppState state); // returns whether we should continue with the next test case
+void drawHull();
+
+/* constants */
 const char* USAGE_STR =
 "Usage: ./ConvexHull [OPTION]... --gpu|--cpu NUMBER_OF_POINTS...\n\n"
 "Compute and display convex hull of a set of points on GPU on CPU, e.g. "
@@ -74,31 +92,22 @@ void main()
 	f_Color = v_Color;
 })";
 
-static constexpr float HULL_POINT_SIZE = 7.f;
-static constexpr float HULL_POINT_COLOR[4] = { 0.f, 1.f, 0.f, 1.f };
-static constexpr float NORMAL_POINT_SIZE = 1.f;
-static constexpr float NORMAL_POINT_COLOR[4] = { 1.f, 1.f, 1.f, 1.f };
-static constexpr float LINE_WIDTH = 0.7f;
-static constexpr float LINE_COLOR[4] = { 0.f, 1.f, 0.f, 0.5f };
+constexpr float HULL_POINT_SIZE = 7.f;
+constexpr float HULL_POINT_COLOR[4] = { 0.f, 1.f, 0.f, 1.f };
+constexpr float NORMAL_POINT_SIZE = 1.f;
+constexpr float NORMAL_POINT_COLOR[4] = { 1.f, 1.f, 1.f, 1.f };
+constexpr float LINE_WIDTH = 0.7f;
+constexpr float LINE_COLOR[4] = { 0.f, 1.f, 0.f, 0.5f };
 
-static constexpr int WIDTH = 800;
-static constexpr int HEIGHT = 800;
+constexpr int WIDTH = 800;
+constexpr int HEIGHT = 800;
 
-static constexpr Config DEFAULT_CONFIG{
+constexpr Config DEFAULT_CONFIG{
 	DatasetType::DISC, 1234, false };
 
-GLFWwindow* window;
-GLint point_size_loc, color_loc;
-int N, hull_count;
-bool is_displaying, is_next_case_request;
-
-void windowErrorHandler(int errCode, const char* desc);
-void windowResizeHandler(GLFWwindow*, int width, int height);
-void windowKeyInputHandler(GLFWwindow* window, int key, int scancode,
-	int action, int mods);
-void setWindowViewport(int width, int height);
-void drawHull();
-bool displayHull(); // returns false when immediate exit was requested by user
+/* variables */
+bool is_next_case_request;
+bool is_redraw_request;
 
 int main(int argc, const char* argv[])
 {
@@ -109,10 +118,10 @@ int main(int argc, const char* argv[])
 	}
 
 	ASSERT(argc > 0);
-
-	// Parse and partition flags (-arg and --arg).
 	ComputeMode compute_mode = ComputeMode::NONE;
 	Config config = DEFAULT_CONFIG;
+
+	/* Parse program arguments */
 	int pivot_idx = 1;
 	for (int i = 1; i < argc; ++i)
 	{
@@ -157,15 +166,14 @@ int main(int argc, const char* argv[])
 		else
 			ERROR("Flag '", arg, "' is no recognized.");
 	}
-	argc = pivot_idx;
 
 	if (compute_mode == ComputeMode::NONE)
 		ERROR("Please specify compute mode with --gpu or --cpu.");
 	if (argc < 2)
 		ERROR("Invalid number of arguments.");
 
-	// Parse positional arguments (number of points).
-	std::vector<int> ns(argc - 1);
+	argc = pivot_idx;
+	std::vector<int> num_points(argc - 1);
 	for (int i = 1; i < argc; ++i)
 	{
 		int n = std::stoi(argv[i]);
@@ -173,10 +181,13 @@ int main(int argc, const char* argv[])
 			ERROR("Number of points has to be positive.");
 		if (n < 3)
 			ERROR("Number of points has to be at least 3.");
-		ns[i - 1] = n;
+		num_points[i - 1] = n;
 	}
+
+    AppState state;
 	
-	glfwSetErrorCallback(windowErrorHandler);
+    /* Initialize OpenGL (GLFW and glew). */
+	glfwSetErrorCallback(glfwErrorHandler);
 	if (!glfwInit())
 		ERROR("Failed to initialize GLFW.");
 
@@ -185,21 +196,21 @@ int main(int argc, const char* argv[])
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	window = glfwCreateWindow(WIDTH, HEIGHT, "Convex Hull", NULL, NULL);
-	if (!window)
+	state.window = glfwCreateWindow(WIDTH, HEIGHT, "Convex Hull", NULL, NULL);
+	if (!state.window)
 	{
 		glfwTerminate();
 		ERROR("Failed to create window.");
 	}
 
-	glfwMakeContextCurrent(window);
-	glfwSetFramebufferSizeCallback(window, windowResizeHandler);
-	glfwSetKeyCallback(window, windowKeyInputHandler);
-	setWindowViewport(WIDTH, HEIGHT);
+	glfwMakeContextCurrent(state.window);
+    windowResizeHandler(state.window, WIDTH, HEIGHT);
+	glfwSetFramebufferSizeCallback(state.window, windowResizeHandler);
+	glfwSetKeyCallback(state.window, windowKeyInputHandler);
 
 	if (glewInit() != GLEW_OK)
 	{
-		glfwDestroyWindow(window);
+		glfwDestroyWindow(state.window);
 		glfwTerminate();
 		ERROR("Failed to initialize GLEW.");
 	}
@@ -221,16 +232,17 @@ int main(int argc, const char* argv[])
 	GLuint shader = Graphics::compileShader(
 		vertex_shader_source, fragment_shader_source);
 	glCall(glUseProgram(shader));
-	glCall(point_size_loc = glGetUniformLocation(shader, "pointSize"));
-	glCall(color_loc = glGetUniformLocation(shader, "color"));
+	glCall(state.point_size_loc = glGetUniformLocation(shader, "pointSize"));
+	glCall(state.color_loc = glGetUniformLocation(shader, "color"));
 
 	glCall(glLineWidth(LINE_WIDTH));
 	glCall(glEnable(GL_BLEND));
 	glCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
 	glCall(glClear(GL_COLOR_BUFFER_BIT));
-	glfwSwapBuffers(window);
+	glfwSwapBuffers(state.window);
 
+    /* Print configuration information. */
 	print(INSTRUCTIONS_STR);
 	switch (compute_mode)
 	{
@@ -240,6 +252,8 @@ int main(int argc, const char* argv[])
 		case ComputeMode::CPU:
 			print("CPU mode selected.");
 			break;
+        default:
+            ASSERT(false);
 	}
 	const char* dataset_name;
 	switch (config.dataset_type)
@@ -256,34 +270,40 @@ int main(int argc, const char* argv[])
 	}
 	print("Running tests on ", dataset_name, " dataset.");
 
+    /* Perform computations. */
 	switch (compute_mode)
 	{
-		case ComputeMode::GPU:
+        case ComputeMode::GPU:
 		{
-			GPU::init(config, ns, vbo);
-			for (int n : ns)
+			GPU::init(config, num_points, vbo);
+			for (int n : num_points)
 			{
-				hull_count = GPU::calculate(N = n);
-				if (!displayHull())
+                state.n_points = n;
+				state.hull_count = GPU::calculate(n);
+				if (!displayHull(state))
 					break;
 			}
-			GPU::terminate();
+			GPU::cleanup();
 			break;
 		}
 		case ComputeMode::CPU:
 		{
-			CPU::init(config, ns);
-			for (int n : ns)
+			CPU::init(config, num_points);
+			for (int n : num_points)
 			{
-				hull_count = CPU::calculate(N = n);
-				if (!displayHull())
+                state.n_points = n;
+				state.hull_count = CPU::calculate(n);
+				if (!displayHull(state))
 					break;
 			}
-			CPU::terminate();
+			CPU::cleanup();
 			break;
 		}
+        default:
+            ASSERT(false);
 	}
 
+    /* Cleanup. */
 	glCall(glDeleteProgram(shader));
 	glCall(glDeleteBuffers(1, &vbo));
 	glCall(glDeleteVertexArrays(1, &vao));
@@ -292,16 +312,19 @@ int main(int argc, const char* argv[])
 	return 0;
 }
 
-void windowErrorHandler(int errCode, const char* desc)
+void glfwErrorHandler(int errCode, const char* desc)
 {
 	WARNING("[GLFW Error] ", desc, " ", errCode);
 }
 
 void windowResizeHandler(GLFWwindow*, int width, int height)
 {
-	setWindowViewport(width, height);
-	if (is_displaying)
-		drawHull();
+	int minSize = std::min(width, height);
+	static constexpr float borderFactor = 0.05f;
+	int border = static_cast<int>(borderFactor * minSize);
+	int corner = minSize - 2 * border;
+	glCall(glViewport(border, border, corner, corner));
+    is_redraw_request = true;
 }
 
 void windowKeyInputHandler(GLFWwindow* window, int key, int,
@@ -320,47 +343,43 @@ void windowKeyInputHandler(GLFWwindow* window, int key, int,
 	}
 }
 
-void setWindowViewport(int width, int height)
-{
-	int minSize = std::min(width, height);
-	static constexpr float borderFactor = 0.05f;
-	int border = static_cast<int>(borderFactor * minSize);
-	int corner = minSize - 2 * border;
-	glCall(glViewport(border, border, corner, corner));
-}
-
-void drawHull()
+void drawHull(AppState state)
 {
 	glCall(glClear(GL_COLOR_BUFFER_BIT));
 
-	glCall(glUniform1f(point_size_loc, NORMAL_POINT_SIZE));
-	glCall(glUniform4fv(color_loc, 1, NORMAL_POINT_COLOR));
-	glCall(glDrawArrays(GL_POINTS, hull_count, N - hull_count));
-	glCall(glUniform4fv(color_loc, 1, LINE_COLOR));
-	glCall(glDrawArrays(GL_LINE_LOOP, 0, hull_count));
-	glCall(glUniform1f(point_size_loc, HULL_POINT_SIZE));
-	glCall(glUniform4fv(color_loc, 1, HULL_POINT_COLOR));
-	glCall(glDrawArrays(GL_POINTS, 0, hull_count));
+	glCall(glUniform1f(state.point_size_loc, NORMAL_POINT_SIZE));
+	glCall(glUniform4fv(state.color_loc, 1, NORMAL_POINT_COLOR));
+	glCall(glDrawArrays(GL_POINTS, state.hull_count, state.n_points - state.hull_count));
+	glCall(glUniform4fv(state.color_loc, 1, LINE_COLOR));
+	glCall(glDrawArrays(GL_LINE_LOOP, 0, state.hull_count));
+	glCall(glUniform1f(state.point_size_loc, HULL_POINT_SIZE));
+	glCall(glUniform4fv(state.color_loc, 1, HULL_POINT_COLOR));
+	glCall(glDrawArrays(GL_POINTS, 0, state.hull_count));
 
-	glfwSwapBuffers(window);
+	glfwSwapBuffers(state.window);
 }
 
-bool displayHull()
+bool displayHull(AppState state)
 {
-	drawHull();
-	is_next_case_request = false;
-	is_displaying = true;
-	while (!glfwWindowShouldClose(window))
+    if (glfwWindowShouldClose(state.window))
+        return false;
+
+	drawHull(state);
+    is_next_case_request = false;
+    is_redraw_request = false;
+
+    do
 	{
+		glfwWaitEvents();
 		if (is_next_case_request)
 		{
-			is_displaying = false;
 			glCall(glClear(GL_COLOR_BUFFER_BIT));
-			glfwSwapBuffers(window);
+			glfwSwapBuffers(state.window);
 			return true;
 		}
-		glfwWaitEvents();
-	}
-	is_displaying = false;
+        if (is_redraw_request)
+            drawHull(state);
+	} while (!glfwWindowShouldClose(state.window));
+
 	return false;
 }

@@ -12,7 +12,10 @@
 
 namespace CPU
 {
+    /* macros */
+	#define PI 3.14159265358f
 
+    /* structs */
 	struct point
 	{
 		float x, y;
@@ -29,22 +32,32 @@ namespace CPU
 		friend std::ostream& operator<<(std::ostream& out, const point& p);
 	};
 
-	#define PI 3.14159265358f
+    struct CPUGenerator 
+    {
+        std::mt19937 rng;
+        std::uniform_real_distribution<float> adist;
+        std::uniform_real_distribution<float> rdist;
+    };
 
-	std::mt19937 rng;
-	std::uniform_real_distribution<float> adist(0, 2 * PI);
-	std::uniform_real_distribution<float> rdist;
-	point* ps, * buffer;
+    struct Memory
+    {
+        point* points;
+        point* buffer;
+    };
 
+    /* forward declarations */
+    int quickHull(point* first, point* last);
 	point* findHull(point* first, point* last, point u, point v);
-	int quickHull(point* first, point* last);
 	template<class Pred>
 	point* half_stable_partition(point* first, point* last, Pred pred);
-	int grahamScan(int n);
+	int grahamScan(point* ps, int n);
 
-	void init(Config config, const std::vector<int>& ns)
+    /* variables */
+    CPUGenerator cpu_gen;
+    Memory mem;
+
+	void init(Config config, const std::vector<int>& num_points)
 	{
-		rng.seed(config.seed);
 		float r_min = 0.f, r_max = 1.f;
 		switch (config.dataset_type)
 		{
@@ -60,11 +73,13 @@ namespace CPU
 			default:
 				ASSERT(false);
 		}
-		rdist = std::uniform_real_distribution<float>(r_min, r_max);
+        cpu_gen.rng.seed(config.seed);
+        cpu_gen.adist.param(decltype(cpu_gen.adist)::param_type(0, 2 * PI));
+        cpu_gen.rdist.param(decltype(cpu_gen.rdist)::param_type(r_min, r_max));
 
-		int max_n = *std::max_element(ns.begin(), ns.end());
-		ps = new point[max_n];
-		buffer = new point[max_n];
+		int max_n = *std::max_element(num_points.begin(), num_points.end());
+		mem.points = new point[max_n];
+		mem.buffer = new point[max_n];
 
 		size_t bytes = max_n * sizeof(point);
 		glCall(glBufferData(GL_ARRAY_BUFFER, bytes, NULL, GL_STATIC_DRAW));
@@ -81,32 +96,32 @@ namespace CPU
 		// Generate points.
 		for (int i = 0; i < n; ++i)
 		{
-			float a = adist(rng), r = rdist(rng);
+			float a = cpu_gen.adist(cpu_gen.rng), r = cpu_gen.rdist(cpu_gen.rng);
 			float x = r * cos(a);
 			float y = r * sin(a);
-			ps[i] = buffer[i] = { x, y };
+			mem.points[i] = mem.buffer[i] = { x, y };
 		}
 
 		int hull_count;
 		{
 			Timer timer("Graham Scan");
-			grahamScan(n);
+			grahamScan(mem.points, n);
 		}
+        std::copy(mem.buffer, mem.buffer + n, mem.points);
 		{
-			std::copy(buffer, buffer + n, ps);
 			Timer timer("QuickHull");
-			hull_count = quickHull(ps, ps + n);
+			hull_count = quickHull(mem.points, mem.points + n);
 		}
 
-		glCall(glBufferSubData(GL_ARRAY_BUFFER, 0, n * sizeof(point), ps));
+		glCall(glBufferSubData(GL_ARRAY_BUFFER, 0, n * sizeof(point), mem.points));
 
 		return hull_count;
 	}
 
-	void terminate()
+	void cleanup()
 	{
-		delete[] ps;
-		delete[] buffer;
+		delete[] mem.points;
+		delete[] mem.buffer;
 	}
 
 	float point::cross(point u, point v)
@@ -229,7 +244,7 @@ namespace CPU
 		return pivot;
 	}
 
-	int grahamScan(int n)
+	int grahamScan(point* ps, int n)
 	{
 		point* min_it = std::min_element(ps, ps + n);
 		point min = *min_it;

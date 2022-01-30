@@ -7,7 +7,10 @@
 
 namespace GPU
 {
-	void init(Config config, const std::vector<int>& ns, GLuint vbo);
+	void init(
+            Config config,
+            const std::vector<int>& n_points,
+            GLuint gl_buffer);
 	int calculate(int n);
-	void terminate();
+	void cleanup();
 }
