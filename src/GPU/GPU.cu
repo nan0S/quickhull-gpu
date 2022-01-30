@@ -126,13 +126,11 @@ namespace GPU
 	__constant__ float d_right_x;
 	__constant__ float d_right_y;
 
-
 	void init(
         Config config,
         const std::vector<int>& n_points,
         GLuint gl_buffer)
 	{
-
 		int max_n = -1, max_n_below_curand_threshold = -1;
 		for (int n : n_points)
 		{

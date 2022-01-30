@@ -320,7 +320,7 @@ void glfwErrorHandler(int errCode, const char* desc)
 void windowResizeHandler(GLFWwindow*, int width, int height)
 {
 	int minSize = std::min(width, height);
-	static constexpr float borderFactor = 0.05f;
+	constexpr float borderFactor = 0.05f;
 	int border = static_cast<int>(borderFactor * minSize);
 	int corner = minSize - 2 * border;
 	glCall(glViewport(border, border, corner, corner));
@@ -348,7 +348,7 @@ bool displayHull(AppState state)
     if (glfwWindowShouldClose(state.window))
         return false;
 
-	drawHull(state);
+    drawHull(state);
     is_next_case_request = false;
     is_redraw_request = false;
 
