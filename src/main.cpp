@@ -17,14 +17,14 @@
 /* enums and structs */
 enum class ComputeMode
 {
-	NONE, GPU, CPU
+   NONE, GPU, CPU
 };
 
 class comma_numpunct : public std::numpunct<char>
 {
 protected:
-	char do_thousands_sep() const { return ','; }
-	std::string do_grouping() const { return "\03"; }
+   char do_thousands_sep() const { return ','; }
+   std::string do_grouping() const { return "\03"; }
 };
 
 struct AppState
@@ -76,9 +76,9 @@ uniform vec4 color;
 
 void main()
 {
-	v_Color = color;
-	gl_PointSize = pointSize;
-	gl_Position = vec4(v_PosX, v_PosY, 0, 1);
+   v_Color = color;
+   gl_PointSize = pointSize;
+   gl_Position = vec4(v_PosX, v_PosY, 0, 1);
 })";
 
 const char* fragment_shader_source =
@@ -90,7 +90,7 @@ out vec4 f_Color;
 
 void main()
 {
-	f_Color = v_Color;
+   f_Color = v_Color;
 })";
 
 constexpr float HULL_POINT_SIZE = 7.f;
@@ -104,7 +104,7 @@ constexpr int WIDTH = 800;
 constexpr int HEIGHT = 800;
 
 constexpr Config DEFAULT_CONFIG{
-	DatasetType::DISC, 1234, false };
+   DatasetType::DISC, 1234, false };
 
 /* variables */
 bool is_next_case_request;
@@ -112,276 +112,276 @@ bool is_redraw_request;
 
 int main(int argc, const char* argv[])
 {
-	{
-		std::locale comma_locale(std::locale(), new comma_numpunct);
-		std::cout.imbue(comma_locale);
-		std::cerr.imbue(comma_locale);
-	}
+   {
+      std::locale comma_locale(std::locale(), new comma_numpunct);
+      std::cout.imbue(comma_locale);
+      std::cerr.imbue(comma_locale);
+   }
 
-	assert(argc > 0);
-	ComputeMode compute_mode = ComputeMode::NONE;
-	Config config = DEFAULT_CONFIG;
+   assert(argc > 0);
+   ComputeMode compute_mode = ComputeMode::NONE;
+   Config config = DEFAULT_CONFIG;
 
-	/* Parse program arguments */
-	int pivot_idx = 1;
-	for (int i = 1; i < argc; ++i)
-	{
-		const char* arg = argv[i];
-		if (arg[0] != '-')
-		{
-			std::swap(argv[i], argv[pivot_idx++]);
-			continue;
-		}
-		const char* flag = (arg[1] == '-' ? arg + 2 : arg + 1);
-		if (strcmp(flag, "gpu") == 0)
-		{
-			if (compute_mode != ComputeMode::NONE)
-				ERROR("Specified more than one compute mode.");
-			compute_mode = ComputeMode::GPU;
-		}
-		else if (strcmp(flag, "cpu") == 0)
-		{
-			if (compute_mode != ComputeMode::NONE)
-				ERROR("Specified more than one compute mode.");
-			compute_mode = ComputeMode::CPU;
-		}
-		else if (strcmp(flag, "disc") == 0)
-			config.dataset_type = DatasetType::DISC;
-		else if (strcmp(flag, "ring") == 0)
-			config.dataset_type = DatasetType::RING;
+   /* Parse program arguments */
+   int pivot_idx = 1;
+   for (int i = 1; i < argc; ++i)
+   {
+      const char* arg = argv[i];
+      if (arg[0] != '-')
+      {
+         std::swap(argv[i], argv[pivot_idx++]);
+         continue;
+      }
+      const char* flag = (arg[1] == '-' ? arg + 2 : arg + 1);
+      if (strcmp(flag, "gpu") == 0)
+      {
+         if (compute_mode != ComputeMode::NONE)
+            ERROR("Specified more than one compute mode.");
+         compute_mode = ComputeMode::GPU;
+      }
+      else if (strcmp(flag, "cpu") == 0)
+      {
+         if (compute_mode != ComputeMode::NONE)
+            ERROR("Specified more than one compute mode.");
+         compute_mode = ComputeMode::CPU;
+      }
+      else if (strcmp(flag, "disc") == 0)
+         config.dataset_type = DatasetType::DISC;
+      else if (strcmp(flag, "ring") == 0)
+         config.dataset_type = DatasetType::RING;
         else if (strcmp(flag, "circle") == 0)
-			config.dataset_type = DatasetType::CIRCLE;
-		else if (strcmp(flag, "seed") == 0)
-		{
-			if (i == argc - 1)
-				ERROR("Argument for flag '", arg, "' is required.");
-			config.seed = std::stoi(argv[++i]);
-		}
-		else if (strcmp(flag, "hostmem") == 0)
-			config.is_host_mem = true;
-		else if (strcmp(flag, "help") == 0)
-		{
-			print(USAGE_STR);
-			exit(EXIT_SUCCESS);
-		}
-		else
-			ERROR("Flag '", arg, "' is no recognized.");
-	}
+         config.dataset_type = DatasetType::CIRCLE;
+      else if (strcmp(flag, "seed") == 0)
+      {
+         if (i == argc - 1)
+            ERROR("Argument for flag '", arg, "' is required.");
+         config.seed = std::stoi(argv[++i]);
+      }
+      else if (strcmp(flag, "hostmem") == 0)
+         config.is_host_mem = true;
+      else if (strcmp(flag, "help") == 0)
+      {
+         print(USAGE_STR);
+         exit(EXIT_SUCCESS);
+      }
+      else
+         ERROR("Flag '", arg, "' is no recognized.");
+   }
 
-	if (compute_mode == ComputeMode::NONE)
-		ERROR("Please specify compute mode with --gpu or --cpu.");
-	if (argc < 2)
-		ERROR("Invalid number of arguments.");
+   if (compute_mode == ComputeMode::NONE)
+      ERROR("Please specify compute mode with --gpu or --cpu.");
+   if (argc < 2)
+      ERROR("Invalid number of arguments.");
 
-	argc = pivot_idx;
-	std::vector<int> num_points(argc - 1);
-	for (int i = 1; i < argc; ++i)
-	{
-		int n = std::stoi(argv[i]);
-		if (n <= 0)
-			ERROR("Number of points has to be positive.");
-		if (n < 3)
-			ERROR("Number of points has to be at least 3.");
-		num_points[i - 1] = n;
-	}
+   argc = pivot_idx;
+   std::vector<int> num_points(argc - 1);
+   for (int i = 1; i < argc; ++i)
+   {
+      int n = std::stoi(argv[i]);
+      if (n <= 0)
+         ERROR("Number of points has to be positive.");
+      if (n < 3)
+         ERROR("Number of points has to be at least 3.");
+      num_points[i - 1] = n;
+   }
 
-    AppState state;
-	
-    /* Initialize OpenGL (GLFW and glew). */
-	glfwSetErrorCallback(glfwErrorHandler);
-	if (!glfwInit())
-		ERROR("Failed to initialize GLFW.");
+   AppState state;
 
-	glfwWindowHint(GLFW_SAMPLES, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+   /* Initialize OpenGL (GLFW and glew). */
+   glfwSetErrorCallback(glfwErrorHandler);
+   if (!glfwInit())
+      ERROR("Failed to initialize GLFW.");
 
-	state.window = glfwCreateWindow(WIDTH, HEIGHT, "Convex Hull", NULL, NULL);
-	if (!state.window)
-	{
-		glfwTerminate();
-		ERROR("Failed to create window.");
-	}
+   glfwWindowHint(GLFW_SAMPLES, 4);
+   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	glfwMakeContextCurrent(state.window);
+   state.window = glfwCreateWindow(WIDTH, HEIGHT, "Convex Hull", NULL, NULL);
+   if (!state.window)
+   {
+      glfwTerminate();
+      ERROR("Failed to create window.");
+   }
+
+   glfwMakeContextCurrent(state.window);
     windowResizeHandler(state.window, WIDTH, HEIGHT);
-	glfwSetFramebufferSizeCallback(state.window, windowResizeHandler);
-	glfwSetKeyCallback(state.window, windowKeyInputHandler);
+   glfwSetFramebufferSizeCallback(state.window, windowResizeHandler);
+   glfwSetKeyCallback(state.window, windowKeyInputHandler);
 
-	if (glewInit() != GLEW_OK)
-	{
-		glfwDestroyWindow(state.window);
-		glfwTerminate();
-		ERROR("Failed to initialize GLEW.");
-	}
+   if (glewInit() != GLEW_OK)
+   {
+      glfwDestroyWindow(state.window);
+      glfwTerminate();
+      ERROR("Failed to initialize GLEW.");
+   }
 
-	glCall(glClearColor(0, 0, 0, 1));
-	glCall(glEnable(GL_VERTEX_PROGRAM_POINT_SIZE));
-	glCall(glEnable(GL_LINE_SMOOTH));
+   glCall(glClearColor(0, 0, 0, 1));
+   glCall(glEnable(GL_VERTEX_PROGRAM_POINT_SIZE));
+   glCall(glEnable(GL_LINE_SMOOTH));
 
-	GLuint vao;
-	glCall(glGenVertexArrays(1, &vao));
-	glCall(glBindVertexArray(vao));
+   GLuint vao;
+   glCall(glGenVertexArrays(1, &vao));
+   glCall(glBindVertexArray(vao));
 
-	GLuint vbo;
-	glCall(glGenBuffers(1, &vbo));
-	glCall(glBindBuffer(GL_ARRAY_BUFFER, vbo));
-	glCall(glEnableVertexAttribArray(0));
-	glCall(glEnableVertexAttribArray(1));
+   GLuint vbo;
+   glCall(glGenBuffers(1, &vbo));
+   glCall(glBindBuffer(GL_ARRAY_BUFFER, vbo));
+   glCall(glEnableVertexAttribArray(0));
+   glCall(glEnableVertexAttribArray(1));
 
-	GLuint shader = Graphics::compileShader(
-		vertex_shader_source, fragment_shader_source);
-	glCall(glUseProgram(shader));
-	glCall(state.point_size_loc = glGetUniformLocation(shader, "pointSize"));
-	glCall(state.color_loc = glGetUniformLocation(shader, "color"));
+   GLuint shader = Graphics::compileShader(
+      vertex_shader_source, fragment_shader_source);
+   glCall(glUseProgram(shader));
+   glCall(state.point_size_loc = glGetUniformLocation(shader, "pointSize"));
+   glCall(state.color_loc = glGetUniformLocation(shader, "color"));
 
-	glCall(glLineWidth(LINE_WIDTH));
-	glCall(glEnable(GL_BLEND));
-	glCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+   glCall(glLineWidth(LINE_WIDTH));
+   glCall(glEnable(GL_BLEND));
+   glCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-	glCall(glClear(GL_COLOR_BUFFER_BIT));
-	glfwSwapBuffers(state.window);
+   glCall(glClear(GL_COLOR_BUFFER_BIT));
+   glfwSwapBuffers(state.window);
 
-    /* Print configuration information. */
-	print(INSTRUCTIONS_STR);
-	switch (compute_mode)
-	{
-		case ComputeMode::GPU:
-			print("GPU mode selected.");
-			break;
-		case ComputeMode::CPU:
-			print("CPU mode selected.");
-			break;
+   /* Print configuration information. */
+   print(INSTRUCTIONS_STR);
+   switch (compute_mode)
+   {
+      case ComputeMode::GPU:
+         print("GPU mode selected.");
+         break;
+      case ComputeMode::CPU:
+         print("CPU mode selected.");
+         break;
         default:
             assert(false);
-	}
-	const char* dataset_name;
-	switch (config.dataset_type)
-	{
-		case DatasetType::DISC:
-			dataset_name = "DISC";
-			break;
-		case DatasetType::RING:
-			dataset_name = "RING";
-			break;
-		case DatasetType::CIRCLE:
-			dataset_name = "CIRCLE";
-			break;
-	}
-	print("Running tests on ", dataset_name, " dataset.");
+   }
+   const char* dataset_name;
+   switch (config.dataset_type)
+   {
+      case DatasetType::DISC:
+         dataset_name = "DISC";
+         break;
+      case DatasetType::RING:
+         dataset_name = "RING";
+         break;
+      case DatasetType::CIRCLE:
+         dataset_name = "CIRCLE";
+         break;
+   }
+   print("Running tests on ", dataset_name, " dataset.");
 
-    /* Perform computations. */
-	switch (compute_mode)
-	{
-        case ComputeMode::GPU:
-		{
-			GPU::init(config, num_points, vbo);
-			for (int n : num_points)
-			{
-                state.n_points = n;
-				state.hull_count = GPU::calculate(n);
-				if (!displayHull(state))
-					break;
-			}
-			GPU::cleanup();
-			break;
-		}
-		case ComputeMode::CPU:
-		{
-			CPU::init(config, num_points);
-			for (int n : num_points)
-			{
-                state.n_points = n;
-				state.hull_count = CPU::calculate(n);
-				if (!displayHull(state))
-					break;
-			}
-			CPU::cleanup();
-			break;
-		}
-        default:
-            assert(false);
-	}
+   /* Perform computations. */
+   switch (compute_mode)
+   {
+      case ComputeMode::GPU:
+      {
+         GPU::init(config, num_points, vbo);
+         for (int n : num_points)
+         {
+            state.n_points = n;
+            state.hull_count = GPU::calculate(n);
+            if (!displayHull(state))
+               break;
+         }
+         GPU::cleanup();
+         break;
+      }
+      case ComputeMode::CPU:
+      {
+         CPU::init(config, num_points);
+         for (int n : num_points)
+         {
+            state.n_points = n;
+            state.hull_count = CPU::calculate(n);
+            if (!displayHull(state))
+               break;
+         }
+         CPU::cleanup();
+         break;
+      }
+      default:
+         assert(false);
+   }
 
-    /* Cleanup. */
-	glCall(glDeleteProgram(shader));
-	glCall(glDeleteBuffers(1, &vbo));
-	glCall(glDeleteVertexArrays(1, &vao));
-	glfwTerminate();
+   /* Cleanup. */
+   glCall(glDeleteProgram(shader));
+   glCall(glDeleteBuffers(1, &vbo));
+   glCall(glDeleteVertexArrays(1, &vao));
+   glfwTerminate();
 
-	return 0;
+   return 0;
 }
 
 void glfwErrorHandler(int errCode, const char* desc)
 {
-	WARNING("[GLFW Error] ", desc, " ", errCode);
+   WARNING("[GLFW Error] ", desc, " ", errCode);
 }
 
 void windowResizeHandler(GLFWwindow*, int width, int height)
 {
-	int minSize = std::min(width, height);
-	constexpr float borderFactor = 0.05f;
-	int border = static_cast<int>(borderFactor * minSize);
-	int corner = minSize - 2 * border;
-	glCall(glViewport(border, border, corner, corner));
-    is_redraw_request = true;
+   int minSize = std::min(width, height);
+   constexpr float borderFactor = 0.05f;
+   int border = static_cast<int>(borderFactor * minSize);
+   int corner = minSize - 2 * border;
+   glCall(glViewport(border, border, corner, corner));
+   is_redraw_request = true;
 }
 
 void windowKeyInputHandler(GLFWwindow* window, int key, int,
-	int action, int)
+   int action, int)
 {
-	switch (key)
-	{
-		case GLFW_KEY_ESCAPE:
-			glfwSetWindowShouldClose(window, GLFW_TRUE);
-			break;
-		case GLFW_KEY_ENTER:
-		case GLFW_KEY_SPACE:
-			if (action == GLFW_PRESS)
-				is_next_case_request = true;
-			break;
-	}
+   switch (key)
+   {
+      case GLFW_KEY_ESCAPE:
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+         break;
+      case GLFW_KEY_ENTER:
+      case GLFW_KEY_SPACE:
+         if (action == GLFW_PRESS)
+            is_next_case_request = true;
+         break;
+   }
 }
 
 bool displayHull(AppState state)
 {
-    if (glfwWindowShouldClose(state.window))
-        return false;
+   if (glfwWindowShouldClose(state.window))
+      return false;
 
-    drawHull(state);
-    is_next_case_request = false;
-    is_redraw_request = false;
+   drawHull(state);
+   is_next_case_request = false;
+   is_redraw_request = false;
 
-    do
-	{
-		glfwWaitEvents();
-		if (is_next_case_request)
-		{
-			glCall(glClear(GL_COLOR_BUFFER_BIT));
-			glfwSwapBuffers(state.window);
-			return true;
-		}
-        if (is_redraw_request)
-            drawHull(state);
-	} while (!glfwWindowShouldClose(state.window));
+   do
+   {
+      glfwWaitEvents();
+      if (is_next_case_request)
+      {
+         glCall(glClear(GL_COLOR_BUFFER_BIT));
+         glfwSwapBuffers(state.window);
+         return true;
+      }
+      if (is_redraw_request)
+         drawHull(state);
+   } while (!glfwWindowShouldClose(state.window));
 
-	return false;
+   return false;
 }
 
 void drawHull(AppState state)
 {
-	glCall(glClear(GL_COLOR_BUFFER_BIT));
+   glCall(glClear(GL_COLOR_BUFFER_BIT));
 
-	glCall(glUniform1f(state.point_size_loc, NORMAL_POINT_SIZE));
-	glCall(glUniform4fv(state.color_loc, 1, NORMAL_POINT_COLOR));
-	glCall(glDrawArrays(GL_POINTS, state.hull_count, state.n_points - state.hull_count));
-	glCall(glUniform4fv(state.color_loc, 1, LINE_COLOR));
-	glCall(glDrawArrays(GL_LINE_LOOP, 0, state.hull_count));
-	glCall(glUniform1f(state.point_size_loc, HULL_POINT_SIZE));
-	glCall(glUniform4fv(state.color_loc, 1, HULL_POINT_COLOR));
-	glCall(glDrawArrays(GL_POINTS, 0, state.hull_count));
+   glCall(glUniform1f(state.point_size_loc, NORMAL_POINT_SIZE));
+   glCall(glUniform4fv(state.color_loc, 1, NORMAL_POINT_COLOR));
+   glCall(glDrawArrays(GL_POINTS, state.hull_count, state.n_points - state.hull_count));
+   glCall(glUniform4fv(state.color_loc, 1, LINE_COLOR));
+   glCall(glDrawArrays(GL_LINE_LOOP, 0, state.hull_count));
+   glCall(glUniform1f(state.point_size_loc, HULL_POINT_SIZE));
+   glCall(glUniform4fv(state.color_loc, 1, HULL_POINT_COLOR));
+   glCall(glDrawArrays(GL_POINTS, 0, state.hull_count));
 
-	glfwSwapBuffers(state.window);
+   glfwSwapBuffers(state.window);
 }
 
