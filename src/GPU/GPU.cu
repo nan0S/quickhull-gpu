@@ -4,7 +4,7 @@
 #include <iostream>
 
 #include <GL/glew.h>
-#include <curand.h>
+#include <curand_kernel.h>
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 
@@ -28,18 +28,15 @@ namespace GPU
 {
    /* macros */
    #define PI 3.14159265358f
+   #define NTHREADS 1024
+   #define NPERTHREAD 1024
+
    #define SEND_TO_GPU(symbol, expr) { \
                auto v = (expr); \
                cudaCall(cudaMemcpyToSymbol(symbol, &v, sizeof(v), 0, \
                                            cudaMemcpyHostToDevice)); }
 
-   /* structs */
-   struct generate_points
-   {
-      __device__
-      void operator()(float& x, float& y) const;
-   };
-
+   /* struct-kernels */
    struct is_above_line
    {
       __device__
@@ -76,20 +73,7 @@ namespace GPU
       bool operator()(int index, int hull_count) const;
    };
 
-   struct GPUGenerator
-   {
-      curandGenerator_t gen;
-      bool is_init;
-   };
-
-   struct CPUGenerator
-   {
-      thrust::minstd_rand rng;
-      thrust::uniform_real_distribution<float> adist;
-      thrust::uniform_real_distribution<float> rdist;
-      bool is_init;
-   };
-
+   /* structs */
    struct Memory
    {
       bool is_host_mem;
@@ -100,20 +84,17 @@ namespace GPU
    };
 
    /* forward declarations */
+   __global__
+   void generatePoints(float* x, float* y, const int N);
    __device__
    float cross(float ux, float uy, float vx, float vy);
    size_t getCudaMemoryNeeded(int n);
 
-   /* constants */
-   constexpr int CURAND_USAGE_THRESHOLD = 12'000'000;
-
-   /* variables */
-   GPUGenerator gpu_gen;
-   CPUGenerator cpu_gen;
-   Memory mem;
-
+   /* GPU variables */
+   __constant__ int d_seed;
+   __constant__ unsigned long long d_offset;
    __constant__ float d_r_min;
-   __constant__ float d_r_max;
+   __constant__ float d_r_diff;
 
    __constant__ float* d_x;
    __constant__ float* d_y;
@@ -126,19 +107,13 @@ namespace GPU
    __constant__ float d_right_x;
    __constant__ float d_right_y;
 
+   /* CPU variables */
+   Memory mem;
+
    void init(Config* config,
              const std::vector<int>& n_points,
              GLuint gl_buffer)
    {
-      int max_n = -1, max_n_below_curand_threshold = -1;
-      for (int n : n_points)
-      {
-         max_n = std::max(max_n, n);
-         if (n < CURAND_USAGE_THRESHOLD)
-            max_n_below_curand_threshold = std::max(
-               max_n_below_curand_threshold, n);
-      }
-
       float r_min = 0.f, r_max = 1.f;
       switch (config->dataset_type)
       {
@@ -154,24 +129,14 @@ namespace GPU
          default:
             assert(false);
       }
-      if (max_n_below_curand_threshold != -1)
-      {
-         cpu_gen.rng.seed(config->seed);
-         cpu_gen.adist.param(decltype(cpu_gen.adist)::param_type(0, 2 * PI));
-         cpu_gen.rdist.param(decltype(cpu_gen.rdist)::param_type(r_min, r_max));
-         cpu_gen.is_init = true;
-      }
-      if (max_n >= CURAND_USAGE_THRESHOLD)
-      {
-         curandCall(curandCreateGenerator(&gpu_gen.gen, CURAND_RNG_PSEUDO_MT19937));
-         curandCall(curandSetPseudoRandomGeneratorSeed(gpu_gen.gen, config->seed));
-         gpu_gen.is_init = true;
-         cudaCall(cudaMemcpyToSymbol(d_r_min, &r_min, sizeof(float)));
-         cudaCall(cudaMemcpyToSymbol(d_r_max, &r_max, sizeof(float)));
-      }
+      float r_diff = r_max - r_min;
+      cudaCall(cudaMemcpyToSymbol(d_seed, &config->seed, sizeof(int)));
+      cudaCall(cudaMemcpyToSymbol(d_r_min, &r_min, sizeof(float)));
+      cudaCall(cudaMemcpyToSymbol(d_r_diff, &r_diff, sizeof(float)));
 
       mem.is_host_mem = config->is_host_mem;
 
+      int max_n = *thrust::max_element(n_points.begin(), n_points.end());
       size_t cuda_needed = getCudaMemoryNeeded(max_n);
       if (!mem.is_host_mem)
       {
@@ -179,11 +144,6 @@ namespace GPU
          glCall(glBufferData(GL_ARRAY_BUFFER, cuda_needed, NULL, GL_STATIC_DRAW));
          cudaCall(cudaGraphicsGLRegisterBuffer(&mem.resource, gl_buffer,
                                                cudaGraphicsMapFlagsWriteDiscard));
-         if (cpu_gen.is_init)
-         {
-            size_t host_bytes = 2 * max_n_below_curand_threshold * sizeof(float);
-            cudaCall(cudaMallocHost(&mem.h_buffer, host_bytes));
-         }
       }
       else
       {
@@ -210,7 +170,6 @@ namespace GPU
          cudaCall(cudaGraphicsResourceGetMappedPointer(&mem.d_buffer, &size, mem.resource));
          assert(size >= cuda_needed);
       }
-      cudaCall(cudaMemset(mem.d_buffer, 0, cuda_needed));
 
       thrust::device_ptr<float> x(reinterpret_cast<float*>(mem.d_buffer));
       thrust::device_ptr<float> y(reinterpret_cast<float*>(x.get() + n));
@@ -227,25 +186,14 @@ namespace GPU
       SEND_TO_GPU(d_flag, flag.get());
 
       // Generate points.
-      if (n < CURAND_USAGE_THRESHOLD)
       {
-         // Use CPU.
-         float* h_x = mem.h_buffer, * h_y = h_x + n;
-         for (int i = 0; i < n; ++i)
-         {
-            float r = cpu_gen.rdist(cpu_gen.rng);
-            float a = cpu_gen.adist(cpu_gen.rng);
-            *h_x++ = r * cos(a);
-            *h_y++ = r * sin(a);
-         }
-         thrust::copy(mem.h_buffer, h_y, x);
-      }
-      else
-      {
-         // Use GPU (cuRAND).
-         curandCall(curandGenerateUniform(gpu_gen.gen, x.get(), 2 * n));
-         thrust::for_each_n(thrust::make_zip_iterator(x, y), n,
-                            thrust::make_zip_function(generate_points{}));
+         static unsigned long long offset = 0;
+         auto iceil = [](int x, int d) { return (x + d - 1) / d; };
+         const int spawn_total = iceil(n, NPERTHREAD);
+         const int nblocks = iceil(spawn_total, NTHREADS);
+         SEND_TO_GPU(d_offset, offset);
+         generatePoints<<<nblocks, NTHREADS>>>(x.get(), y.get(), n);
+         offset += n;
       }
 
       Timer timer("QuickHull");
@@ -278,13 +226,14 @@ namespace GPU
       thrust::sort(pivot, thrust::make_zip_iterator(x+n, y+n));
 
       // Initialize head.
+      cudaCall(cudaMemset(head.get(), 0, n * sizeof(int)));
       head[0] = 1;
       head[pivot.get_iterator_tuple().get<0>() - x] = 1;
 
       // Prepare variables.
+      const int N = n;
       int hull_count = 0;
       int last_hull_count = 0;
-      const int N = n;
       auto diter = thrust::make_discard_iterator();
 
       while (hull_count < n)
@@ -388,30 +337,12 @@ namespace GPU
       if (!mem.is_host_mem)
       {
          cudaCall(cudaGraphicsUnregisterResource(mem.resource));
-         if (cpu_gen.is_init)
-         {
-            cudaCall(cudaFreeHost(mem.h_buffer));
-         }
       }
       else
       {
          cudaCall(cudaFree(mem.d_buffer));
          cudaCall(cudaFreeHost(mem.h_buffer));
       }
-
-      if (gpu_gen.is_init)
-      {
-         curandCall(curandDestroyGenerator(gpu_gen.gen));
-      }
-   }
-
-   __device__
-   void generate_points::operator()(float& x, float& y) const
-   {
-      float a = x * 2 * PI;
-      float r = (d_r_max - d_r_min) * y + d_r_min;
-      x = r * cos(a);
-      y = r * sin(a);
    }
 
    __device__
@@ -505,6 +436,22 @@ namespace GPU
       float vx = d_x[nxt] - px, vy = d_y[nxt] - py;
 
       return cross(ux, uy, vx, vy) != 0;
+   }
+   
+   __global__
+   void generatePoints(float* x, float* y, const int N)
+   {
+      int idx = threadIdx.x + blockIdx.x * NPERTHREAD * blockDim.x;
+      curandState state;
+      curand_init(d_seed, idx, d_offset, &state);
+      for (int i = 0; i < NPERTHREAD && idx < N; ++i)
+      {
+         float r = curand_uniform(&state) * d_r_diff + d_r_min;
+         float a = curand_uniform(&state) * 2 * PI;
+         x[idx] = r * cos(a);
+         y[idx] = r * sin(a);
+         idx += blockDim.x;
+      }
    }
 
    __device__

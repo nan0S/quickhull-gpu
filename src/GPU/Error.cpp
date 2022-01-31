@@ -2,6 +2,8 @@
 
 #include <filesystem>
 
+#include <cuda_runtime.h>
+
 #include "Utils/Log.h"
 
 namespace fs = std::filesystem;
