@@ -39,10 +39,10 @@ namespace CPU
    CPUGenerator cpu_gen;
    Memory mem;
 
-   void init(Config config, const std::vector<int>& num_points)
+   void init(Config* config, const std::vector<int>& num_points)
    {
       float r_min = 0.f, r_max = 1.f;
-      switch (config.dataset_type)
+      switch (config->dataset_type)
       {
          case DatasetType::DISC:
             r_min = 0.f; r_max = 1.f;
@@ -56,7 +56,7 @@ namespace CPU
          default:
             assert(false);
       }
-      cpu_gen.rng.seed(config.seed);
+      cpu_gen.rng.seed(config->seed);
       cpu_gen.adist.param(decltype(cpu_gen.adist)::param_type(0, 2 * PI));
       cpu_gen.rdist.param(decltype(cpu_gen.rdist)::param_type(r_min, r_max));
 

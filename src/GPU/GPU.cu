@@ -126,7 +126,7 @@ namespace GPU
    __constant__ float d_right_x;
    __constant__ float d_right_y;
 
-   void init(Config config,
+   void init(Config* config,
              const std::vector<int>& n_points,
              GLuint gl_buffer)
    {
@@ -140,7 +140,7 @@ namespace GPU
       }
 
       float r_min = 0.f, r_max = 1.f;
-      switch (config.dataset_type)
+      switch (config->dataset_type)
       {
          case DatasetType::DISC:
             r_min = 0.f; r_max = 1.f;
@@ -156,7 +156,7 @@ namespace GPU
       }
       if (max_n_below_curand_threshold != -1)
       {
-         cpu_gen.rng.seed(config.seed);
+         cpu_gen.rng.seed(config->seed);
          cpu_gen.adist.param(decltype(cpu_gen.adist)::param_type(0, 2 * PI));
          cpu_gen.rdist.param(decltype(cpu_gen.rdist)::param_type(r_min, r_max));
          cpu_gen.is_init = true;
@@ -164,13 +164,13 @@ namespace GPU
       if (max_n >= CURAND_USAGE_THRESHOLD)
       {
          curandCall(curandCreateGenerator(&gpu_gen.gen, CURAND_RNG_PSEUDO_MT19937));
-         curandCall(curandSetPseudoRandomGeneratorSeed(gpu_gen.gen, config.seed));
+         curandCall(curandSetPseudoRandomGeneratorSeed(gpu_gen.gen, config->seed));
          gpu_gen.is_init = true;
          cudaCall(cudaMemcpyToSymbol(d_r_min, &r_min, sizeof(float)));
          cudaCall(cudaMemcpyToSymbol(d_r_max, &r_max, sizeof(float)));
       }
 
-      mem.is_host_mem = config.is_host_mem;
+      mem.is_host_mem = config->is_host_mem;
 
       size_t cuda_needed = getCudaMemoryNeeded(max_n);
       if (!mem.is_host_mem)

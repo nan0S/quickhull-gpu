@@ -276,7 +276,7 @@ int main(int argc, const char* argv[])
    {
       case ComputeMode::GPU:
       {
-         GPU::init(config, num_points, vbo);
+         GPU::init(&config, num_points, vbo);
          for (int n : num_points)
          {
             state.n_points = n;
@@ -289,7 +289,7 @@ int main(int argc, const char* argv[])
       }
       case ComputeMode::CPU:
       {
-         CPU::init(config, num_points);
+         CPU::init(&config, num_points);
          for (int n : num_points)
          {
             state.n_points = n;
