@@ -67,9 +67,9 @@ namespace CPU
       size_t bytes = max_n * sizeof(point);
       glCall(glBufferData(GL_ARRAY_BUFFER, bytes, NULL, GL_STATIC_DRAW));
       glCall(glVertexAttribPointer(0, 1, GL_FLOAT, GL_FALSE, sizeof(point),
-         (const void*)offsetof(point, x)));
+                                   reinterpret_cast<const void*>(offsetof(point, x))));
       glCall(glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(point),
-         (const void*)offsetof(point, y)));
+                                   reinterpret_cast<const void*>(offsetof(point, y))));
    }
 
    int calculate(int n)

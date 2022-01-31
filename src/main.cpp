@@ -40,8 +40,8 @@ struct AppState
 void glfwErrorHandler(int errCode, const char* desc);
 void windowResizeHandler(GLFWwindow*, int width, int height);
 void windowKeyInputHandler(GLFWwindow*, int key, int, int action, int);
-bool displayHull(AppState state); // returns whether we should continue with the next test case
-void drawHull(AppState state);
+bool displayHull(AppState* state); // returns whether we should continue with the next test case
+void drawHull(AppState* state);
 
 /* constants */
 const char* USAGE_STR =
@@ -60,7 +60,7 @@ const char* USAGE_STR =
 
 const char* INSTRUCTIONS_STR =
 "Press SPACE/ENTER to go to the next test case.\n"
-"Press ESCAPE to exit.\n";
+"Press ESCAPE/Q to exit.\n";
 
 const char* vertex_shader_source =
 R"(
@@ -149,7 +149,7 @@ int main(int argc, const char* argv[])
          config.dataset_type = DatasetType::DISC;
       else if (strcmp(flag, "ring") == 0)
          config.dataset_type = DatasetType::RING;
-        else if (strcmp(flag, "circle") == 0)
+      else if (strcmp(flag, "circle") == 0)
          config.dataset_type = DatasetType::CIRCLE;
       else if (strcmp(flag, "seed") == 0)
       {
@@ -230,8 +230,8 @@ int main(int argc, const char* argv[])
    glCall(glEnableVertexAttribArray(0));
    glCall(glEnableVertexAttribArray(1));
 
-   GLuint shader = Graphics::compileShader(
-      vertex_shader_source, fragment_shader_source);
+   GLuint shader = Graphics::compileShader(vertex_shader_source,
+                                           fragment_shader_source);
    glCall(glUseProgram(shader));
    glCall(state.point_size_loc = glGetUniformLocation(shader, "pointSize"));
    glCall(state.color_loc = glGetUniformLocation(shader, "color"));
@@ -281,7 +281,7 @@ int main(int argc, const char* argv[])
          {
             state.n_points = n;
             state.hull_count = GPU::calculate(n);
-            if (!displayHull(state))
+            if (!displayHull(&state))
                break;
          }
          GPU::cleanup();
@@ -294,7 +294,7 @@ int main(int argc, const char* argv[])
          {
             state.n_points = n;
             state.hull_count = CPU::calculate(n);
-            if (!displayHull(state))
+            if (!displayHull(&state))
                break;
          }
          CPU::cleanup();
@@ -334,6 +334,7 @@ void windowKeyInputHandler(GLFWwindow* window, int key, int,
    switch (key)
    {
       case GLFW_KEY_ESCAPE:
+      case GLFW_KEY_Q:
          glfwSetWindowShouldClose(window, GLFW_TRUE);
          break;
       case GLFW_KEY_ENTER:
@@ -344,9 +345,10 @@ void windowKeyInputHandler(GLFWwindow* window, int key, int,
    }
 }
 
-bool displayHull(AppState state)
+bool displayHull(AppState* state)
 {
-   if (glfwWindowShouldClose(state.window))
+   glfwPollEvents();
+   if (glfwWindowShouldClose(state->window))
       return false;
 
    drawHull(state);
@@ -359,29 +361,31 @@ bool displayHull(AppState state)
       if (is_next_case_request)
       {
          glCall(glClear(GL_COLOR_BUFFER_BIT));
-         glfwSwapBuffers(state.window);
+         glfwSwapBuffers(state->window);
          return true;
       }
       if (is_redraw_request)
          drawHull(state);
-   } while (!glfwWindowShouldClose(state.window));
+   } while (!glfwWindowShouldClose(state->window));
 
    return false;
 }
 
-void drawHull(AppState state)
+void drawHull(AppState* state)
 {
    glCall(glClear(GL_COLOR_BUFFER_BIT));
 
-   glCall(glUniform1f(state.point_size_loc, NORMAL_POINT_SIZE));
-   glCall(glUniform4fv(state.color_loc, 1, NORMAL_POINT_COLOR));
-   glCall(glDrawArrays(GL_POINTS, state.hull_count, state.n_points - state.hull_count));
-   glCall(glUniform4fv(state.color_loc, 1, LINE_COLOR));
-   glCall(glDrawArrays(GL_LINE_LOOP, 0, state.hull_count));
-   glCall(glUniform1f(state.point_size_loc, HULL_POINT_SIZE));
-   glCall(glUniform4fv(state.color_loc, 1, HULL_POINT_COLOR));
-   glCall(glDrawArrays(GL_POINTS, 0, state.hull_count));
+   glCall(glUniform1f(state->point_size_loc, NORMAL_POINT_SIZE));
+   glCall(glUniform4fv(state->color_loc, 1, NORMAL_POINT_COLOR));
+   glCall(glDrawArrays(GL_POINTS,
+                       state->hull_count,
+                       state->n_points - state->hull_count));
+   glCall(glUniform4fv(state->color_loc, 1, LINE_COLOR));
+   glCall(glDrawArrays(GL_LINE_LOOP, 0, state->hull_count));
+   glCall(glUniform1f(state->point_size_loc, HULL_POINT_SIZE));
+   glCall(glUniform4fv(state->color_loc, 1, HULL_POINT_COLOR));
+   glCall(glDrawArrays(GL_POINTS, 0, state->hull_count));
 
-   glfwSwapBuffers(state.window);
+   glfwSwapBuffers(state->window);
 }
 

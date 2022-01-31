@@ -35,11 +35,9 @@ namespace Graphics
          {
             GLint length;
             glCall(glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length));
-            GLchar* msg = reinterpret_cast<GLchar*>(
-               alloca(length * sizeof(GLchar)));
+            GLchar* msg = reinterpret_cast<GLchar*>(alloca(length * sizeof(GLchar)));
             glCall(glGetShaderInfoLog(id, length, &length, msg));
-            ERROR("Shader (", shaderTypeToString(shader_type),
-               ") compilation error: '", msg, "'.");
+            ERROR("Shader (", shaderTypeToString(shader_type), ") compilation error: '", msg, "'.");
          }
 
          return id;
@@ -62,8 +60,7 @@ namespace Graphics
       {
          GLint length;
          glCall(glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length));
-         GLchar* msg = reinterpret_cast<GLchar*>(
-            alloca(length * sizeof(GLchar)));
+         GLchar* msg = reinterpret_cast<GLchar*>(alloca(length * sizeof(GLchar)));
          glCall(glGetProgramInfoLog(program, length, &length, msg));
          ERROR("Program link error: '{}'.", msg);
       }

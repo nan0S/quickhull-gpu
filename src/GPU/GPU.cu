@@ -29,9 +29,9 @@ namespace GPU
    /* macros */
    #define PI 3.14159265358f
    #define SEND_TO_GPU(symbol, expr) { \
-                  auto v = (expr); \
-                  cudaCall(cudaMemcpyToSymbol(symbol, &v, sizeof(v), 0, \
-                     cudaMemcpyHostToDevice)); }
+               auto v = (expr); \
+               cudaCall(cudaMemcpyToSymbol(symbol, &v, sizeof(v), 0, \
+                                           cudaMemcpyHostToDevice)); }
 
    /* structs */
    struct generate_points
@@ -67,8 +67,7 @@ namespace GPU
    struct calc_outerior
    {
       __device__
-      bool operator()(float x, float y, int key, int head, int hull_count)
-         const;
+      bool operator()(float x, float y, int key, int head, int hull_count) const;
    };
 
    struct is_on_hull
@@ -127,10 +126,9 @@ namespace GPU
    __constant__ float d_right_x;
    __constant__ float d_right_y;
 
-   void init(
-      Config config,
-      const std::vector<int>& n_points,
-      GLuint gl_buffer)
+   void init(Config config,
+             const std::vector<int>& n_points,
+             GLuint gl_buffer)
    {
       int max_n = -1, max_n_below_curand_threshold = -1;
       for (int n : n_points)
@@ -158,16 +156,16 @@ namespace GPU
       }
       if (max_n_below_curand_threshold != -1)
       {
-         cpu_gen.rng = thrust::minstd_rand(config.seed);
-         cpu_gen.adist = thrust::uniform_real_distribution<float>(0, 2 * PI);
-         cpu_gen.rdist = thrust::uniform_real_distribution<float>(r_min, r_max);
+         cpu_gen.rng.seed(config.seed);
+         cpu_gen.adist.param(decltype(cpu_gen.adist)::param_type(0, 2 * PI));
+         cpu_gen.rdist.param(decltype(cpu_gen.rdist)::param_type(r_min, r_max));
          cpu_gen.is_init = true;
       }
       if (max_n >= CURAND_USAGE_THRESHOLD)
       {
          curandCall(curandCreateGenerator(&gpu_gen.gen, CURAND_RNG_PSEUDO_MT19937));
          curandCall(curandSetPseudoRandomGeneratorSeed(gpu_gen.gen, config.seed));
-            gpu_gen.is_init = true;
+         gpu_gen.is_init = true;
          cudaCall(cudaMemcpyToSymbol(d_r_min, &r_min, sizeof(float)));
          cudaCall(cudaMemcpyToSymbol(d_r_max, &r_max, sizeof(float)));
       }
@@ -180,7 +178,7 @@ namespace GPU
          // Allocate OpenGL buffer and prepare to map it into CUDA.
          glCall(glBufferData(GL_ARRAY_BUFFER, cuda_needed, NULL, GL_STATIC_DRAW));
          cudaCall(cudaGraphicsGLRegisterBuffer(&mem.resource, gl_buffer,
-            cudaGraphicsMapFlagsWriteDiscard));
+                                               cudaGraphicsMapFlagsWriteDiscard));
          if (cpu_gen.is_init)
          {
             size_t host_bytes = 2 * max_n_below_curand_threshold * sizeof(float);
@@ -247,38 +245,37 @@ namespace GPU
          // Use GPU (cuRAND).
          curandCall(curandGenerateUniform(gpu_gen.gen, x.get(), 2 * n));
          thrust::for_each_n(thrust::make_zip_iterator(x, y), n,
-            thrust::make_zip_function(generate_points{}));
+                            thrust::make_zip_function(generate_points{}));
       }
 
       Timer timer("QuickHull");
 
       // Find leftmost and rightmost points.
-      auto it = thrust::minmax_element(
-         thrust::make_zip_iterator(x, y),
-         thrust::make_zip_iterator(x + n, y + n));
+      auto it = thrust::minmax_element(thrust::make_zip_iterator(x, y),
+                                       thrust::make_zip_iterator(x+n, y+n));
       auto it_left = it.first.get_iterator_tuple();
       auto it_right = it.second.get_iterator_tuple();
       cudaCall(cudaMemcpyToSymbol(d_left_x, it_left.get<0>().get(),
-         sizeof(float), 0, cudaMemcpyDeviceToDevice));
+                                  sizeof(float), 0, cudaMemcpyDeviceToDevice));
       cudaCall(cudaMemcpyToSymbol(d_left_y, it_left.get<1>().get(),
-         sizeof(float), 0, cudaMemcpyDeviceToDevice));
+                                  sizeof(float), 0, cudaMemcpyDeviceToDevice));
       cudaCall(cudaMemcpyToSymbol(d_right_x, it_right.get<0>().get(),
-         sizeof(float), 0, cudaMemcpyDeviceToDevice));
+                                  sizeof(float), 0, cudaMemcpyDeviceToDevice));
       cudaCall(cudaMemcpyToSymbol(d_right_y, it_right.get<1>().get(),
-         sizeof(float), 0, cudaMemcpyDeviceToDevice));
+                                  sizeof(float), 0, cudaMemcpyDeviceToDevice));
       int left_idx = static_cast<int>(it_left.get<0>() - x);
       int right_idx = static_cast<int>(it_right.get<0>() - x);
 
       // Partition into lower and upper parts.
-      auto pivot = thrust::partition(
-         thrust::make_zip_iterator(x, y),
-         thrust::make_zip_iterator(x + n, y + n),
-         thrust::make_zip_function(is_above_line{}));
+      auto pivot = thrust::partition(thrust::make_zip_iterator(x, y),
+                                     thrust::make_zip_iterator(x+n, y+n),
+                                     thrust::make_zip_function(is_above_line{}));
       int pivot_idx = static_cast<int>(pivot.get_iterator_tuple().get<0>() - x);
 
       // Sort points in lower and upper parts.
-      thrust::sort(thrust::make_zip_iterator(x, y), pivot, thrust::greater<>());
-      thrust::sort(pivot, thrust::make_zip_iterator(x + n, y + n));
+      thrust::sort(thrust::make_zip_iterator(x, y), pivot,
+                   thrust::greater<>());
+      thrust::sort(pivot, thrust::make_zip_iterator(x+n, y+n));
 
       // Initialize head.
       head[0] = 1;
@@ -288,11 +285,12 @@ namespace GPU
       int hull_count = 0;
       int last_hull_count = 0;
       const int N = n;
+      auto diter = thrust::make_discard_iterator();
 
       while (hull_count < n)
       {
          // Calculate keys from head.
-         auto end = thrust::inclusive_scan(head, head + n, keys);
+         thrust::device_ptr<int> end = thrust::inclusive_scan(head, head+n, keys);
          hull_count = *(end - 1);
          // Line distance calculation ensured that segment borders will not
          // be selected as the farthest point in the segment (unless there
@@ -307,71 +305,61 @@ namespace GPU
 
          // Calculate first_pts from keys and head.
          thrust::counting_iterator<int> iter(0);
-         thrust::for_each(
-            thrust::make_zip_iterator(head, keys, iter),
-            thrust::make_zip_iterator(head + n, keys + n, iter + n),
-            thrust::make_zip_function(calc_first_pts{}));
+         thrust::for_each(thrust::make_zip_iterator(head, keys, iter),
+                          thrust::make_zip_iterator(head+n, keys+n, iter+n),
+                          thrust::make_zip_function(calc_first_pts{}));
 
          // Calculate distances from segment lines.
-         thrust::transform(
-            thrust::make_zip_iterator(x, y, keys,
-               thrust::make_constant_iterator(hull_count)),
-            thrust::make_zip_iterator(x + n, y + n, keys + n,
-               thrust::make_constant_iterator(hull_count)),
-            dist,
-            thrust::make_zip_function(calc_line_dist{}));
+         auto hull_count_citer = thrust::make_constant_iterator<int>(hull_count);
+         thrust::transform(thrust::make_zip_iterator(x, y, keys, hull_count_citer),
+                           thrust::make_zip_iterator(x+n, y+n, keys+n, hull_count_citer),
+                           dist,
+                           thrust::make_zip_function(calc_line_dist{}));
 
          // Find farthest points in segments.
-         auto reduction_border = thrust::reduce_by_key(
-            // reduction keys
-            keys, keys + n,
-            // values input
-            thrust::make_zip_iterator(dist, thrust::make_counting_iterator(0)),
-            // keys output - throw away
-            thrust::make_discard_iterator(),
-            // values output - only care about index
-            thrust::make_zip_iterator(thrust::make_discard_iterator(), flag),
-            // use maximum to reduce
-            thrust::equal_to<>(), thrust::maximum<>())
-         .second.get_iterator_tuple().get<1>();
+         thrust::device_ptr<int> reduction_border =
+            thrust::reduce_by_key(// reduction keys
+                                  keys, keys+n,
+                                  // values input
+                                  thrust::make_zip_iterator(dist, thrust::make_counting_iterator(0)),
+                                  // keys output - throw away
+                                  diter,
+                                  // values output - only care about index
+                                  thrust::make_zip_iterator(diter, flag),
+                                  // use maximum to reduce
+                                  thrust::equal_to<>(), thrust::maximum<>())
+            .second.get_iterator_tuple().get<1>();
 
          // Update heads with farthest points.
          thrust::for_each(flag, reduction_border, update_heads{});
 
          // Determine outerior points.
-         thrust::device_ptr<int> outerior = thrust::device_ptr<int>(
-            reinterpret_cast<int*>(dist.get()));
-         thrust::constant_iterator<int> citer(hull_count);
-         thrust::transform(
-            thrust::make_zip_iterator(x, y, keys, head, citer),
-            thrust::make_zip_iterator(x + n, y + n, keys + n, head + n, citer),
-            outerior,
-            thrust::make_zip_function(calc_outerior{}));
+         auto outerior = thrust::device_ptr<int>(reinterpret_cast<int*>(dist.get()));
+         thrust::transform(thrust::make_zip_iterator(x, y, keys, head, hull_count_citer),
+                           thrust::make_zip_iterator(x+n, y+n, keys+n, head+n, hull_count_citer),
+                           outerior,
+                           thrust::make_zip_function(calc_outerior{}));
 
          // Discard interior points.
          n = static_cast<int>(
-            thrust::stable_partition(
-               thrust::make_zip_iterator(x, y, head),
-               thrust::make_zip_iterator(x + n, y + n, head + n),
-               outerior,
-               // move outerior points to the beginning
-               thrust::placeholders::_1 == 1)
-            .get_iterator_tuple().get<0>() - x);
+               thrust::stable_partition(thrust::make_zip_iterator(x, y, head),
+                                        thrust::make_zip_iterator(x+n, y+n, head+n),
+                                        outerior,
+                                        // move outerior points to the beginning
+                                        thrust::placeholders::_1 == 1)
+               .get_iterator_tuple().get<0>() - x);
       }
 
       // Filter potentially at most one point that is one the line between
       // its neightbours.
       if (n > 2)
       {
-         thrust::counting_iterator<int> count_iter =
-            thrust::make_counting_iterator(0);
-         thrust::constant_iterator<int> const_iter = 
-            thrust::make_constant_iterator(n);
+         auto count_iter = thrust::make_counting_iterator(0);
+         auto const_iter = thrust::make_constant_iterator(n);
          hull_count = static_cast<int>(
-            thrust::stable_partition(
-               thrust::make_zip_iterator(count_iter, const_iter),
-               thrust::make_zip_iterator(count_iter + n, const_iter + n),
-               thrust::make_zip_function(is_on_hull{}))
+            thrust::stable_partition(thrust::make_zip_iterator(count_iter, const_iter),
+                                     thrust::make_zip_iterator(count_iter+n, const_iter+n),
+                                     thrust::make_zip_function(is_on_hull{}))
             .get_iterator_tuple().get<0>() - count_iter);
       }
 
@@ -390,7 +378,7 @@ namespace GPU
       }
 
       glCall(glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 0,
-            (const void*)(N * sizeof(float))));
+                                   reinterpret_cast<const void*>(N * sizeof(float))));
 
       return hull_count;
    }

@@ -26,7 +26,7 @@ DEP += $(patsubst %.cu,$(BUILD_DIR)/%.d,$(SRC))
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	g++ $(CXXFLAGS) -o $@ $^ $(INC) $(LIB)
+	g++ $(CXXFLAGS) -o $@ $^ $(LIB)
 
 -include $(DEP)
 
