@@ -25,18 +25,18 @@ namespace Graphics
 
       GLuint compile(GLenum shader_type, const char* source)
       {
-         glCall(GLuint id = glCreateShader(shader_type));
-         glCall(glShaderSource(id, 1, &source, NULL));
-         glCall(glCompileShader(id));
+         GL_CALL(GLuint id = glCreateShader(shader_type));
+         GL_CALL(glShaderSource(id, 1, &source, NULL));
+         GL_CALL(glCompileShader(id));
 
          GLint success;
-         glCall(glGetShaderiv(id, GL_COMPILE_STATUS, &success));
+         GL_CALL(glGetShaderiv(id, GL_COMPILE_STATUS, &success));
          if (!success)
          {
             GLint length;
-            glCall(glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length));
+            GL_CALL(glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length));
             GLchar* msg = reinterpret_cast<GLchar*>(alloca(length * sizeof(GLchar)));
-            glCall(glGetShaderInfoLog(id, length, &length, msg));
+            GL_CALL(glGetShaderInfoLog(id, length, &length, msg));
             ERROR("Shader (", shaderTypeToString(shader_type), ") compilation error: '", msg, "'.");
          }
 
@@ -49,24 +49,24 @@ namespace Graphics
       GLuint vs = compile(GL_VERTEX_SHADER, vertex_source);
       GLuint fs = compile(GL_FRAGMENT_SHADER, fragment_source);
 
-      glCall(GLuint program = glCreateProgram());
-      glCall(glAttachShader(program, vs));
-      glCall(glAttachShader(program, fs));
-      glCall(glLinkProgram(program));
+      GL_CALL(GLuint program = glCreateProgram());
+      GL_CALL(glAttachShader(program, vs));
+      GL_CALL(glAttachShader(program, fs));
+      GL_CALL(glLinkProgram(program));
 
       GLint success;
-      glCall(glGetProgramiv(program, GL_LINK_STATUS, &success));
+      GL_CALL(glGetProgramiv(program, GL_LINK_STATUS, &success));
       if (!success)
       {
          GLint length;
-         glCall(glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length));
+         GL_CALL(glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length));
          GLchar* msg = reinterpret_cast<GLchar*>(alloca(length * sizeof(GLchar)));
-         glCall(glGetProgramInfoLog(program, length, &length, msg));
+         GL_CALL(glGetProgramInfoLog(program, length, &length, msg));
          ERROR("Program link error: '{}'.", msg);
       }
 
-      glCall(glDeleteShader(vs));
-      glCall(glDeleteShader(fs));
+      GL_CALL(glDeleteShader(vs));
+      GL_CALL(glDeleteShader(fs));
 
       return program;
    }

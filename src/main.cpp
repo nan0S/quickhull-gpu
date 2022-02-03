@@ -62,7 +62,7 @@ const char* INSTRUCTIONS_STR =
 "Press SPACE/ENTER to go to the next test case.\n"
 "Press ESCAPE/Q to exit.\n";
 
-const char* vertex_shader_source =
+const char* VERTEX_SHADER_SOURCE =
 R"(
 #version 330 core
 
@@ -81,7 +81,7 @@ void main()
    gl_Position = vec4(v_PosX, v_PosY, 0, 1);
 })";
 
-const char* fragment_shader_source =
+const char* FRAGMENT_SHADER_SOURCE =
 R"(
 #version 330 core
 
@@ -205,42 +205,41 @@ int main(int argc, const char* argv[])
    }
 
    glfwMakeContextCurrent(state.window);
-    windowResizeHandler(state.window, WIDTH, HEIGHT);
+   windowResizeHandler(state.window, WIDTH, HEIGHT);
    glfwSetFramebufferSizeCallback(state.window, windowResizeHandler);
    glfwSetKeyCallback(state.window, windowKeyInputHandler);
 
    if (glewInit() != GLEW_OK)
    {
-      glfwDestroyWindow(state.window);
       glfwTerminate();
       ERROR("Failed to initialize GLEW.");
    }
 
-   glCall(glClearColor(0, 0, 0, 1));
-   glCall(glEnable(GL_VERTEX_PROGRAM_POINT_SIZE));
-   glCall(glEnable(GL_LINE_SMOOTH));
+   GL_CALL(glClearColor(0, 0, 0, 1));
+   GL_CALL(glEnable(GL_VERTEX_PROGRAM_POINT_SIZE));
+   GL_CALL(glEnable(GL_LINE_SMOOTH));
 
    GLuint vao;
-   glCall(glGenVertexArrays(1, &vao));
-   glCall(glBindVertexArray(vao));
+   GL_CALL(glGenVertexArrays(1, &vao));
+   GL_CALL(glBindVertexArray(vao));
 
    GLuint vbo;
-   glCall(glGenBuffers(1, &vbo));
-   glCall(glBindBuffer(GL_ARRAY_BUFFER, vbo));
-   glCall(glEnableVertexAttribArray(0));
-   glCall(glEnableVertexAttribArray(1));
+   GL_CALL(glGenBuffers(1, &vbo));
+   GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, vbo));
+   GL_CALL(glEnableVertexAttribArray(0));
+   GL_CALL(glEnableVertexAttribArray(1));
 
-   GLuint shader = Graphics::compileShader(vertex_shader_source,
-                                           fragment_shader_source);
-   glCall(glUseProgram(shader));
-   glCall(state.point_size_loc = glGetUniformLocation(shader, "pointSize"));
-   glCall(state.color_loc = glGetUniformLocation(shader, "color"));
+   GLuint shader = Graphics::compileShader(VERTEX_SHADER_SOURCE,
+                                           FRAGMENT_SHADER_SOURCE);
+   GL_CALL(glUseProgram(shader));
+   GL_CALL(state.point_size_loc = glGetUniformLocation(shader, "pointSize"));
+   GL_CALL(state.color_loc = glGetUniformLocation(shader, "color"));
 
-   glCall(glLineWidth(LINE_WIDTH));
-   glCall(glEnable(GL_BLEND));
-   glCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+   GL_CALL(glLineWidth(LINE_WIDTH));
+   GL_CALL(glEnable(GL_BLEND));
+   GL_CALL(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-   glCall(glClear(GL_COLOR_BUFFER_BIT));
+   GL_CALL(glClear(GL_COLOR_BUFFER_BIT));
    glfwSwapBuffers(state.window);
 
    /* Print configuration information. */
@@ -305,9 +304,9 @@ int main(int argc, const char* argv[])
    }
 
    /* Cleanup. */
-   glCall(glDeleteProgram(shader));
-   glCall(glDeleteBuffers(1, &vbo));
-   glCall(glDeleteVertexArrays(1, &vao));
+   GL_CALL(glDeleteProgram(shader));
+   GL_CALL(glDeleteBuffers(1, &vbo));
+   GL_CALL(glDeleteVertexArrays(1, &vao));
    glfwTerminate();
 
    return 0;
@@ -324,7 +323,7 @@ void windowResizeHandler(GLFWwindow*, int width, int height)
    constexpr float borderFactor = 0.05f;
    int border = static_cast<int>(borderFactor * minSize);
    int corner = minSize - 2 * border;
-   glCall(glViewport(border, border, corner, corner));
+   GL_CALL(glViewport(border, border, corner, corner));
    is_redraw_request = true;
 }
 
@@ -360,7 +359,7 @@ bool displayHull(AppState* state)
       glfwWaitEvents();
       if (is_next_case_request)
       {
-         glCall(glClear(GL_COLOR_BUFFER_BIT));
+         GL_CALL(glClear(GL_COLOR_BUFFER_BIT));
          glfwSwapBuffers(state->window);
          return true;
       }
@@ -373,18 +372,18 @@ bool displayHull(AppState* state)
 
 void drawHull(AppState* state)
 {
-   glCall(glClear(GL_COLOR_BUFFER_BIT));
+   GL_CALL(glClear(GL_COLOR_BUFFER_BIT));
 
-   glCall(glUniform1f(state->point_size_loc, NORMAL_POINT_SIZE));
-   glCall(glUniform4fv(state->color_loc, 1, NORMAL_POINT_COLOR));
-   glCall(glDrawArrays(GL_POINTS,
+   GL_CALL(glUniform1f(state->point_size_loc, NORMAL_POINT_SIZE));
+   GL_CALL(glUniform4fv(state->color_loc, 1, NORMAL_POINT_COLOR));
+   GL_CALL(glDrawArrays(GL_POINTS,
                        state->hull_count,
                        state->n_points - state->hull_count));
-   glCall(glUniform4fv(state->color_loc, 1, LINE_COLOR));
-   glCall(glDrawArrays(GL_LINE_LOOP, 0, state->hull_count));
-   glCall(glUniform1f(state->point_size_loc, HULL_POINT_SIZE));
-   glCall(glUniform4fv(state->color_loc, 1, HULL_POINT_COLOR));
-   glCall(glDrawArrays(GL_POINTS, 0, state->hull_count));
+   GL_CALL(glUniform4fv(state->color_loc, 1, LINE_COLOR));
+   GL_CALL(glDrawArrays(GL_LINE_LOOP, 0, state->hull_count));
+   GL_CALL(glUniform1f(state->point_size_loc, HULL_POINT_SIZE));
+   GL_CALL(glUniform4fv(state->color_loc, 1, HULL_POINT_COLOR));
+   GL_CALL(glDrawArrays(GL_POINTS, 0, state->hull_count));
 
    glfwSwapBuffers(state->window);
 }

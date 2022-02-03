@@ -65,10 +65,10 @@ namespace CPU
       mem.buffer = new point[max_n];
 
       size_t bytes = max_n * sizeof(point);
-      glCall(glBufferData(GL_ARRAY_BUFFER, bytes, NULL, GL_STATIC_DRAW));
-      glCall(glVertexAttribPointer(0, 1, GL_FLOAT, GL_FALSE, sizeof(point),
+      GL_CALL(glBufferData(GL_ARRAY_BUFFER, bytes, NULL, GL_STATIC_DRAW));
+      GL_CALL(glVertexAttribPointer(0, 1, GL_FLOAT, GL_FALSE, sizeof(point),
                                    reinterpret_cast<const void*>(offsetof(point, x))));
-      glCall(glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(point),
+      GL_CALL(glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(point),
                                    reinterpret_cast<const void*>(offsetof(point, y))));
    }
 
@@ -97,7 +97,7 @@ namespace CPU
          hull_count = quickHull(mem.points, mem.points + n);
       }
 
-      glCall(glBufferSubData(GL_ARRAY_BUFFER, 0, n * sizeof(point), mem.points));
+      GL_CALL(glBufferSubData(GL_ARRAY_BUFFER, 0, n * sizeof(point), mem.points));
 
       return hull_count;
    }

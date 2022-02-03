@@ -33,7 +33,7 @@ namespace GPU
 
    #define SEND_TO_GPU(symbol, expr) { \
                auto v = (expr); \
-               cudaCall(cudaMemcpyToSymbol(symbol, &v, sizeof(v), 0, \
+               CUDA_CALL(cudaMemcpyToSymbol(symbol, &v, sizeof(v), 0, \
                                            cudaMemcpyHostToDevice)); }
 
    /* struct-kernels */
@@ -130,9 +130,9 @@ namespace GPU
             assert(false);
       }
       float r_diff = r_max - r_min;
-      cudaCall(cudaMemcpyToSymbol(d_seed, &config->seed, sizeof(int)));
-      cudaCall(cudaMemcpyToSymbol(d_r_min, &r_min, sizeof(float)));
-      cudaCall(cudaMemcpyToSymbol(d_r_diff, &r_diff, sizeof(float)));
+      CUDA_CALL(cudaMemcpyToSymbol(d_seed, &config->seed, sizeof(int)));
+      CUDA_CALL(cudaMemcpyToSymbol(d_r_min, &r_min, sizeof(float)));
+      CUDA_CALL(cudaMemcpyToSymbol(d_r_diff, &r_diff, sizeof(float)));
 
       mem.is_host_mem = config->is_host_mem;
 
@@ -141,20 +141,20 @@ namespace GPU
       if (!mem.is_host_mem)
       {
          // Allocate OpenGL buffer and prepare to map it into CUDA.
-         glCall(glBufferData(GL_ARRAY_BUFFER, cuda_needed, NULL, GL_STATIC_DRAW));
-         cudaCall(cudaGraphicsGLRegisterBuffer(&mem.resource, gl_buffer,
+         GL_CALL(glBufferData(GL_ARRAY_BUFFER, cuda_needed, NULL, GL_STATIC_DRAW));
+         CUDA_CALL(cudaGraphicsGLRegisterBuffer(&mem.resource, gl_buffer,
                                                cudaGraphicsMapFlagsWriteDiscard));
       }
       else
       {
          // Allocate OpenGL, CUDA and host buffers. CUDA->host->OpenGL->draw.
          size_t bytes = 2 * max_n * sizeof(float);
-         glCall(glBufferData(GL_ARRAY_BUFFER, bytes, NULL, GL_STATIC_DRAW));
-         cudaCall(cudaMalloc(&mem.d_buffer, cuda_needed));
-         cudaCall(cudaMallocHost(&mem.h_buffer, bytes));
+         GL_CALL(glBufferData(GL_ARRAY_BUFFER, bytes, NULL, GL_STATIC_DRAW));
+         CUDA_CALL(cudaMalloc(&mem.d_buffer, cuda_needed));
+         CUDA_CALL(cudaMallocHost(&mem.h_buffer, bytes));
       }
 
-      glCall(glVertexAttribPointer(0, 1, GL_FLOAT, GL_FALSE, 0, 0));
+      GL_CALL(glVertexAttribPointer(0, 1, GL_FLOAT, GL_FALSE, 0, 0));
    }
 
    int calculate(int n)
@@ -166,8 +166,8 @@ namespace GPU
       if (!mem.is_host_mem)
       {
          size_t size = 0;
-         cudaCall(cudaGraphicsMapResources(1, &mem.resource));
-         cudaCall(cudaGraphicsResourceGetMappedPointer(&mem.d_buffer, &size, mem.resource));
+         CUDA_CALL(cudaGraphicsMapResources(1, &mem.resource));
+         CUDA_CALL(cudaGraphicsResourceGetMappedPointer(&mem.d_buffer, &size, mem.resource));
          assert(size >= cuda_needed);
       }
 
@@ -192,7 +192,7 @@ namespace GPU
          const int spawn_total = iceil(n, NPERTHREAD);
          const int nblocks = iceil(spawn_total, NTHREADS);
          SEND_TO_GPU(d_offset, offset);
-         generatePoints<<<nblocks, NTHREADS>>>(x.get(), y.get(), n);
+         CUDA_CALL(generatePoints<<<nblocks, NTHREADS>>>(x.get(), y.get(), n));
          offset += n;
       }
 
@@ -203,13 +203,13 @@ namespace GPU
                                        thrust::make_zip_iterator(x+n, y+n));
       auto it_left = it.first.get_iterator_tuple();
       auto it_right = it.second.get_iterator_tuple();
-      cudaCall(cudaMemcpyToSymbol(d_left_x, it_left.get<0>().get(),
+      CUDA_CALL(cudaMemcpyToSymbol(d_left_x, it_left.get<0>().get(),
                                   sizeof(float), 0, cudaMemcpyDeviceToDevice));
-      cudaCall(cudaMemcpyToSymbol(d_left_y, it_left.get<1>().get(),
+      CUDA_CALL(cudaMemcpyToSymbol(d_left_y, it_left.get<1>().get(),
                                   sizeof(float), 0, cudaMemcpyDeviceToDevice));
-      cudaCall(cudaMemcpyToSymbol(d_right_x, it_right.get<0>().get(),
+      CUDA_CALL(cudaMemcpyToSymbol(d_right_x, it_right.get<0>().get(),
                                   sizeof(float), 0, cudaMemcpyDeviceToDevice));
-      cudaCall(cudaMemcpyToSymbol(d_right_y, it_right.get<1>().get(),
+      CUDA_CALL(cudaMemcpyToSymbol(d_right_y, it_right.get<1>().get(),
                                   sizeof(float), 0, cudaMemcpyDeviceToDevice));
       int left_idx = static_cast<int>(it_left.get<0>() - x);
       int right_idx = static_cast<int>(it_right.get<0>() - x);
@@ -226,7 +226,7 @@ namespace GPU
       thrust::sort(pivot, thrust::make_zip_iterator(x+n, y+n));
 
       // Initialize head.
-      cudaCall(cudaMemset(head.get(), 0, n * sizeof(int)));
+      CUDA_CALL(cudaMemset(head.get(), 0, n * sizeof(int)));
       head[0] = 1;
       head[pivot.get_iterator_tuple().get<0>() - x] = 1;
 
@@ -316,17 +316,17 @@ namespace GPU
 
       if (!mem.is_host_mem)
       {
-         cudaCall(cudaGraphicsUnmapResources(1, &mem.resource));
+         CUDA_CALL(cudaGraphicsUnmapResources(1, &mem.resource));
       }
       else
       {
          // Copy: CUDA->host->OpenGL.
          size_t bytes = 2 * N * sizeof(float);
-         cudaCall(cudaMemcpy(mem.h_buffer, mem.d_buffer, bytes, cudaMemcpyDeviceToHost));
-         glCall(glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, mem.h_buffer));
+         CUDA_CALL(cudaMemcpy(mem.h_buffer, mem.d_buffer, bytes, cudaMemcpyDeviceToHost));
+         GL_CALL(glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, mem.h_buffer));
       }
 
-      glCall(glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 0,
+      GL_CALL(glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 0,
                                    reinterpret_cast<const void*>(N * sizeof(float))));
 
       return hull_count;
@@ -336,12 +336,12 @@ namespace GPU
    {
       if (!mem.is_host_mem)
       {
-         cudaCall(cudaGraphicsUnregisterResource(mem.resource));
+         CUDA_CALL(cudaGraphicsUnregisterResource(mem.resource));
       }
       else
       {
-         cudaCall(cudaFree(mem.d_buffer));
-         cudaCall(cudaFreeHost(mem.h_buffer));
+         CUDA_CALL(cudaFree(mem.d_buffer));
+         CUDA_CALL(cudaFreeHost(mem.h_buffer));
       }
    }
 
