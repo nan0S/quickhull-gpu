@@ -122,7 +122,7 @@ int main(int argc, const char* argv[])
    ComputeMode compute_mode = ComputeMode::NONE;
    Config config = DEFAULT_CONFIG;
 
-   /* Parse program arguments */
+   /* Parse program arguments. */
    int pivot_idx = 1;
    for (int i = 1; i < argc; ++i)
    {
