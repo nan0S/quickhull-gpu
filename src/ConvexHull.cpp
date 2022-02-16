@@ -167,13 +167,13 @@ int main(int argc, const char* argv[])
       else
          ERROR("Flag '", arg, "' is no recognized.");
    }
+   argc = pivot_idx;
 
    if (compute_mode == ComputeMode::NONE)
       ERROR("Please specify compute mode with --gpu or --cpu.");
    if (argc < 2)
       ERROR("Invalid number of arguments.");
 
-   argc = pivot_idx;
    std::vector<int> num_points(argc - 1);
    for (int i = 1; i < argc; ++i)
    {
