@@ -34,12 +34,14 @@ struct AppState
     GLint color_loc;
     int n_points;
     int hull_count;
+    bool is_next_case_request;
+    bool is_redraw_request;
 };
 
 /* forward declarations */
 void glfwErrorHandler(int errCode, const char* desc);
-void windowResizeHandler(GLFWwindow*, int width, int height);
-void windowKeyInputHandler(GLFWwindow*, int key, int, int action, int);
+void windowResizeHandler(GLFWwindow* window, int width, int height);
+void windowKeyInputHandler(GLFWwindow* window, int key, int, int action, int);
 bool displayHull(AppState* state); // returns whether we should continue with the next test case
 void drawHull(AppState* state);
 
@@ -105,10 +107,6 @@ constexpr int HEIGHT = 800;
 
 constexpr Config DEFAULT_CONFIG{
    DatasetType::DISC, 1234, false };
-
-/* variables */
-bool is_next_case_request;
-bool is_redraw_request;
 
 int main(int argc, const char* argv[])
 {
@@ -185,7 +183,7 @@ int main(int argc, const char* argv[])
       num_points[i - 1] = n;
    }
 
-   AppState state;
+   AppState state = {};
 
    /* Initialize OpenGL (GLFW and glew). */
    glfwSetErrorCallback(glfwErrorHandler);
@@ -204,6 +202,7 @@ int main(int argc, const char* argv[])
       ERROR("Failed to create window.");
    }
 
+   glfwSetWindowUserPointer(state.window, &state);
    glfwMakeContextCurrent(state.window);
    windowResizeHandler(state.window, WIDTH, HEIGHT);
    glfwSetFramebufferSizeCallback(state.window, windowResizeHandler);
@@ -317,14 +316,15 @@ void glfwErrorHandler(int errCode, const char* desc)
    WARNING("[GLFW Error] ", desc, " ", errCode);
 }
 
-void windowResizeHandler(GLFWwindow*, int width, int height)
+void windowResizeHandler(GLFWwindow* window, int width, int height)
 {
    int minSize = std::min(width, height);
    constexpr float borderFactor = 0.05f;
    int border = static_cast<int>(borderFactor * minSize);
    int corner = minSize - 2 * border;
    GL_CALL(glViewport(border, border, corner, corner));
-   is_redraw_request = true;
+   AppState* app_state = (AppState*)glfwGetWindowUserPointer(window);
+   app_state->is_redraw_request = true;
 }
 
 void windowKeyInputHandler(GLFWwindow* window, int key, int,
@@ -339,7 +339,10 @@ void windowKeyInputHandler(GLFWwindow* window, int key, int,
       case GLFW_KEY_ENTER:
       case GLFW_KEY_SPACE:
          if (action == GLFW_PRESS)
-            is_next_case_request = true;
+         {
+            AppState* app_state = (AppState*)glfwGetWindowUserPointer(window);
+            app_state->is_next_case_request = true;
+         }
          break;
    }
 }
@@ -351,19 +354,17 @@ bool displayHull(AppState* state)
       return false;
 
    drawHull(state);
-   is_next_case_request = false;
-   is_redraw_request = false;
-
+   state->is_next_case_request = false;
    do
    {
       glfwWaitEvents();
-      if (is_next_case_request)
+      if (state->is_next_case_request)
       {
          GL_CALL(glClear(GL_COLOR_BUFFER_BIT));
          glfwSwapBuffers(state->window);
          return true;
       }
-      if (is_redraw_request)
+      if (state->is_redraw_request)
          drawHull(state);
    } while (!glfwWindowShouldClose(state->window));
 
@@ -373,7 +374,6 @@ bool displayHull(AppState* state)
 void drawHull(AppState* state)
 {
    GL_CALL(glClear(GL_COLOR_BUFFER_BIT));
-
    GL_CALL(glUniform1f(state->point_size_loc, NORMAL_POINT_SIZE));
    GL_CALL(glUniform4fv(state->color_loc, 1, NORMAL_POINT_COLOR));
    GL_CALL(glDrawArrays(GL_POINTS,
@@ -384,7 +384,7 @@ void drawHull(AppState* state)
    GL_CALL(glUniform1f(state->point_size_loc, HULL_POINT_SIZE));
    GL_CALL(glUniform4fv(state->color_loc, 1, HULL_POINT_COLOR));
    GL_CALL(glDrawArrays(GL_POINTS, 0, state->hull_count));
-
    glfwSwapBuffers(state->window);
+   state->is_redraw_request = false;
 }
 
